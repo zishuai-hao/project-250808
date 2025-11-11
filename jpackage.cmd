@@ -1,0 +1,12 @@
+jpackage ^
+    --name sdq-data-push ^
+    --input Y:\code\zhidiancekong\lijianshu\sdq-data-push\output  ^
+    --main-jar sdq-data-push-1.0.jar ^
+    --main-class org.springframework.boot.loader.JarLauncher ^
+    --type msi ^
+    --app-version 1.0.0 ^
+    --dest output ^
+    --win-menu ^
+    --win-shortcut ^
+    --win-dir-chooser ^
+    --win-console
