@@ -34,7 +34,7 @@ spring:
         login-username: zd
         login-password: 123456
   profiles:
-    active: @profiles.active@
+    active: dev
   sql:
     init:
       mode: never # 危险的开关

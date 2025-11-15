@@ -1,0 +1,50 @@
+### 0、用户名密码登录，得到token
+POST https://www.zhtk-iot.com:8543/api/login
+Content-Type: application/json
+
+{
+  "accountName": "dxkj",
+  "password": "dxkj250808",
+  "code": "1234"
+}
+
+> {%
+    client.global.set("loginToken", response.body.data.loginToken);
+    client.log("登录成功，Token: " + response.body.data.loginToken);
+%}
+
+###
+
+### 1、获取传感器列表
+POST https://www.zhtk-iot.com:8543/api/DataProvision/sensorList
+Authorization: {{loginToken}}
+Content-Type: application/json
+
+{
+  "pagesize": "10",
+  "curpagenum": "1",
+  "snAddress": "",
+  "tpCode": "",
+  "devState": "",
+  "sortMode": "desc"
+}
+
+###
+
+### 2、获取1051倾角历史数据 - 示例 SN: 1500000001
+POST https://www.zhtk-iot.com:8543/api/DataProvision/getRtHistoryData
+Authorization: {{loginToken}}
+Content-Type: application/json
+
+{
+  "sn": "1524020752",
+  "tp": "1051",
+  "tpc": "qj",
+  "startTm": "2025-11-11 12:00:00",
+  "endTm": "2025-11-13 00:00:00",
+  "sortMode": "asc",
+  "pagesize": 10,
+  "curpagenum": 1
+}
+
+###
