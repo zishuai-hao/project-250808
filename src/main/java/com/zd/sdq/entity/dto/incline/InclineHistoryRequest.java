@@ -18,7 +18,7 @@ public class InclineHistoryRequest {
     /**
      * 设备类型，如：1051
      */
-    private String tp;
+    private String tp = "1051";
     
     /**
      * 数据类型：qj-倾角数据

@@ -33,9 +33,14 @@ public class RadarWaterLevelServerManager {
     private final Vertx vertx;
 
     /**
-     *  存储所有运行中的TCP服务器，key为设备key
+     *  存储所有运行中的TCP服务器，key为设备编码
      */
     private final Map<String, SingleDeviceRadarWaterLevelServer> serverMap = new ConcurrentHashMap<>();
+    
+    /**
+     *  存储端口占用情况，key为端口号，value为设备编码
+     */
+    private final Map<String, String> portMap = new ConcurrentHashMap<>();
 
     /**
      * 启动所有WLV设备的TCP服务器
@@ -86,6 +91,7 @@ public class RadarWaterLevelServerManager {
         });
         
         serverMap.clear();
+        portMap.clear();
         log.info("所有雷达水位仪TCP服务器已停止");
     }
 
@@ -94,33 +100,69 @@ public class RadarWaterLevelServerManager {
      */
     public void startServer(DeviceInfoExt device) {
         String deviceCode = device.getDeviceCode();
+        String port = device.getPort();
+        
         // 验证设备配置
         if (!validateDeviceConfig(device)) {
             log.warn("设备[{}]配置不完整，跳过启动", deviceCode);
             return;
         }
         
-        // 检查是否已经启动
+        // 检查设备是否已经启动
         if (serverMap.containsKey(deviceCode)) {
             log.warn("设备[{}]的TCP服务器已经在运行中", deviceCode);
+            return;
+        }
+        
+        // 检查端口是否已被占用
+        if (portMap.containsKey(port)) {
+            String occupyingDevice = portMap.get(port);
+            log.error("设备[{}]端口[{}]已被设备[{}]占用，无法启动", 
+                    deviceCode, port, occupyingDevice);
             return;
         }
         
         try {
             // 创建并启动TCP服务器
             SingleDeviceRadarWaterLevelServer server = new SingleDeviceRadarWaterLevelServer(
-                    device, mqttAdapter, vertx);
+                    device, mqttAdapter, vertx, deviceInfoExtMapper);
             server.start();
             
             // 添加到管理列表
             serverMap.put(deviceCode, server);
+            portMap.put(port, deviceCode);
             
             log.info("设备[{}]的TCP服务器启动成功，端口: {}, 地址: {}",
-                    deviceCode, device.getPort(), device.getRemoteDeviceId());
+                    deviceCode, port, device.getRemoteDeviceId());
             
         } catch (Exception e) {
             log.error("启动设备[{}]的TCP服务器失败: {}", deviceCode, e.getMessage(), e);
+            // 启动失败时清理端口映射
+            portMap.remove(port);
             throw e;
+        }
+    }
+
+    /**
+     * 停止单个设备的TCP服务器
+     */
+    public void stopServer(String deviceCode) {
+        SingleDeviceRadarWaterLevelServer server = serverMap.get(deviceCode);
+        if (server == null) {
+            log.warn("设备[{}]的TCP服务器不存在或未运行", deviceCode);
+            return;
+        }
+        
+        try {
+            server.stop();
+            serverMap.remove(deviceCode);
+            
+            // 清理端口映射
+            portMap.entrySet().removeIf(entry -> entry.getValue().equals(deviceCode));
+            
+            log.info("设备[{}]的TCP服务器已停止", deviceCode);
+        } catch (Exception e) {
+            log.error("停止设备[{}]的TCP服务器失败: {}", deviceCode, e.getMessage(), e);
         }
     }
 
@@ -175,6 +217,29 @@ public class RadarWaterLevelServerManager {
         
         if (device.getMqttGatewayId() == null) {
             log.warn("设备[{}]MQTT网关ID为空", device.getDeviceCode());
+            return false;
+        }
+        
+        // 验证frequency字段
+        if (device.getFrequency() == null || device.getFrequency().trim().isEmpty()) {
+            log.warn("设备[{}]采集频率配置为空", device.getDeviceCode());
+            return false;
+        }
+        
+        try {
+            int frequency = Integer.parseInt(device.getFrequency());
+            if (frequency <= 0) {
+                log.warn("设备[{}]采集频率必须大于0: {}", device.getDeviceCode(), frequency);
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            log.warn("设备[{}]采集频率配置无效: {}", device.getDeviceCode(), device.getFrequency());
+            return false;
+        }
+        
+        // 验证baseline字段
+        if (device.getBaseline() == null) {
+            log.warn("设备[{}]基线值配置为空", device.getDeviceCode());
             return false;
         }
         

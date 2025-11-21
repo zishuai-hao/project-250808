@@ -37,11 +37,11 @@ Authorization: {{loginToken}}
 Content-Type: application/json
 
 {
-  "sn": "1524020752",
+  "sn": "1524020743",
   "tp": "1051",
   "tpc": "qj",
-  "startTm": "2025-11-11 12:00:00",
-  "endTm": "2025-11-13 00:00:00",
+  "startTm": "2025-11-19 12:00:00",
+  "endTm": "2025-11-20 00:00:00",
   "sortMode": "asc",
   "pagesize": 10,
   "curpagenum": 1

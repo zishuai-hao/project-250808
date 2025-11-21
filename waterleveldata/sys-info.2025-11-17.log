@@ -1,0 +1,265 @@
+00:08:30.692 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.821 m
+00:08:31.869 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 19.209 m
+00:18:30.677 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.783 m
+00:18:31.529 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 19.134 m
+00:28:30.658 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.748 m
+00:28:31.774 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 19.058 m
+00:35:43.249 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[ZYXH-WLV-P01-001-02]客户端连接: 79.124.49.218:64358
+00:35:43.249 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[ZYXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+00:35:43.249 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[ZYXH-WLV-P01-001-02]客户端连接已关闭: 36.151.218.70:4446
+00:36:29.771 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[ZYXH-WLV-P01-001-02]客户端连接: 36.151.218.70:46634
+00:36:29.771 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[ZYXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+00:38:30.652 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.731 m
+00:46:57.694 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[ZYXH-WLV-P01-001-02]客户端连接已关闭: 36.151.218.70:46634
+00:48:30.636 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.717 m
+00:58:30.643 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.708 m
+00:58:34.171 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[ZYXH-WLV-P01-001-02]客户端连接: 36.151.218.83:1024
+00:58:34.171 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[ZYXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+01:08:30.687 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.703 m
+01:08:34.546 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 18.943 m
+01:18:23.025 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMDI1MzV9.E_956RsEt4pP3ZrauMCM-AjBo3l991tFPAI74F5Dc4-Ckodus2_4sWnF8pp5AKU3vbDB_tJb1XqGwf38omqQ7A
+01:18:30.650 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.708 m
+01:18:34.534 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 18.946 m
+01:19:22.645 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+01:19:22.832 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMDI1OTV9.S-cW6LjX8I1JhnG2v9wTiDODsRKYO-gX02NaBYk29mlFfrbg7aokLgszB1W45NsKNePWG0AF4RYV2HPa-_h8Ug
+01:19:22.833 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+01:28:30.647 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.698 m
+01:28:34.513 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[ZYXH-WLV-P01-001-02]当前水位: 18.94 m
+01:33:36.670 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[ZYXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.218:64358
+01:38:30.657 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.71 m
+01:48:30.641 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.709 m
+01:58:30.651 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.71 m
+02:08:30.660 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.72 m
+02:18:30.681 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.759 m
+02:28:30.680 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.802 m
+02:38:23.023 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMDczMzV9.XxBwTd5nomCr0VFuV9azGlDC8L7cFXayNkqeis6Ukr8FPwEgU9GMLKOgDN0kyerVp4Ip76J0NxVqkvRWxGdfqQ
+02:38:30.653 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.862 m
+02:39:22.647 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+02:39:22.829 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMDczOTV9.YWf5OoLAIJxdCxLqrg5o-XT9i_r24-PWwDEahEsfpD8RW8u1nfgkz4ApEy1DSOZJXB4UGrX34h6iBfPvxb0sJA
+02:39:22.830 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+02:48:30.659 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.908 m
+02:48:43.844 [http-nio-42009-exec-2] INFO  o.a.c.h.Http11Processor - [log,175] - Error parsing HTTP request header
+ Note: further occurrences of HTTP request parsing errors will be logged at DEBUG level.
+java.lang.IllegalArgumentException: Invalid character found in method name [0x030x000x00/*0xe00x000x000x000x000x00Cookie: ]. HTTP method names must be tokens
+	at org.apache.coyote.http11.Http11InputBuffer.parseRequestLine(Http11InputBuffer.java:406)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:257)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:905)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1741)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1190)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63)
+	at java.base/java.lang.Thread.run(Thread.java:842)
+02:58:30.644 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.942 m
+03:08:30.685 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.008 m
+03:18:30.693 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.047 m
+03:28:30.697 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.142 m
+03:38:30.666 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.209 m
+03:48:30.653 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.257 m
+03:58:23.061 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMTIxMzV9.d1-pZrvC35lb2E0aAJYCuhLtVJV7sSIzCGXJXMdnbpwUE4QQN3U0idgmZnyY7C6WITfhXpGUczZOrvDvKp6bhQ
+03:58:30.671 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.363 m
+03:59:22.651 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+03:59:22.846 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMTIxOTV9.9HHZQuXZgwZfj1HaBSkJ2RvYJoxs3ptSJQrSsx72bLhKtWaFAHrSeyx2De8XeFq2Nxwq-eXk6-AoItp0TzV7JA
+03:59:22.846 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+04:08:30.672 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.417 m
+04:18:30.682 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.484 m
+04:28:30.683 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.555 m
+04:38:30.699 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.59 m
+04:48:30.655 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.684 m
+04:58:30.663 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.758 m
+05:08:30.640 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.801 m
+05:18:22.998 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMTY5MzV9.8SrhPX3SaIASEFTZAm3zTmxm0VrurLAGKAnfkh7stPUqvSGp_MNs2NF_vJ8ZYiXE-lORIagOlGJtB-tMaI7bQQ
+05:18:30.663 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.855 m
+05:19:22.665 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+05:19:22.858 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMTY5OTV9.iurC-Gapyt4cLPufkLtVwyA0a6bDyGVuHHi8fabJjW_7SGNB8P5g8rjd4vIFpVJ-1jMLcHuwP0RIpJ8vDQfMGg
+05:19:22.858 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+05:28:30.673 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.914 m
+05:38:30.701 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.956 m
+05:48:30.664 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.029 m
+05:58:30.672 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.092 m
+06:08:30.651 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.138 m
+06:18:30.664 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.19 m
+06:28:30.702 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.225 m
+06:38:23.034 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMjE3MzV9.MPiNTjbitgZAYG5Fa9TAvS7FJfARj1qRd-7vfsEAYMVMQoWk3xd8JD03xSniG5hYv48Kg_YGFJWMR8n9O_2v1g
+06:38:30.687 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.267 m
+06:39:22.659 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+06:39:22.852 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMjE3OTV9.loK45rv3crxhnBXPceRmx2yyaqBQ_v8dsPPSb6DdaAlsT1lko9CPm7jqsWrGe0plCq4hePgaF5U_7G4DiKABzQ
+06:39:22.852 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+06:48:30.649 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.322 m
+06:58:30.666 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.339 m
+07:08:30.651 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.399 m
+07:18:30.661 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.405 m
+07:28:30.694 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.419 m
+07:38:30.827 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.469 m
+07:48:30.705 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.479 m
+07:58:23.025 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMjY1MzV9.dMQtnxMw6Q5Xzd4r3QPhFcewYb8Rak9tvo0kNr7tPv9czg8VvQz3rW9GyjwrQz-KtORclYeylSg2pCGrCpspxA
+07:58:30.705 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.503 m
+07:59:22.661 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+07:59:22.855 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMjY1OTV9.EC2eqHIrvQ4Jyv_fg8pCRwwUvqc5766-UB2unQAhTj6_kVfRDX2S4E07c42-Egavp9oc00Q1qR5xpW3YS6CKVQ
+07:59:22.856 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+08:08:30.655 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.506 m
+08:18:30.681 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.508 m
+08:28:30.665 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.496 m
+08:38:30.688 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.513 m
+08:48:30.649 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.454 m
+08:58:30.655 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.414 m
+09:08:30.807 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.37 m
+09:18:23.026 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMzEzMzV9.648VReynTpvhWeU_aIeLr1OD1kG6zX1hQV3kfv5D02tOO6ty5NM7a0qQt8FBDx7uGl4dgEGtoPniB1dOHTEQBg
+09:18:30.654 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.317 m
+09:19:22.669 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+09:19:22.866 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMzEzOTV9.wd3KitSpahZOLEfboxACL_GrgS59ATdQwLeY7MH2SLvEAdqe6B-LXLNBjBRXE-Pva9J75Sh9P-H6v_J3vZiEaw
+09:19:22.866 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+09:28:30.672 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.25 m
+09:38:30.677 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.198 m
+09:48:30.692 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.131 m
+09:58:30.686 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.043 m
+10:08:30.643 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.959 m
+10:18:30.655 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.894 m
+10:25:44.900 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[JYHDQ-WLV-P01-001-02]客户端连接: 79.124.49.218:64938
+10:25:44.900 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[JYHDQ-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+10:28:31.086 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.806 m
+10:30:05.366 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[CBXH-WLV-P01-001-02]客户端连接: 79.124.49.218:64917
+10:30:05.367 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[CBXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+10:35:45.115 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[JYHDQ-WLV-P01-001-02]客户端连接已关闭: 79.124.49.218:64938
+10:38:23.019 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMzYxMzV9.6WbUhv6O_CdMRejKr9ReKZjgXQeRgshgnyG_kX_7v7GwDkk9jxVTJQSo9eSlF_j262e7hD_a778GPlfPkIpKeQ
+10:38:30.689 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.717 m
+10:39:22.660 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+10:39:22.842 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyMzYxOTV9.s2DZOROKnleUnoxp9W4I6jEzNbdzqRD0AMQPKNwFwUvUxH-FXbWCTFPXpKTYU6hLnvxVHIUaeL78_I3D6KqA1Q
+10:39:22.842 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+10:40:05.573 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[CBXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.218:64917
+10:40:24.393 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[YDXH-WLV-P01-001-02]客户端连接: 79.124.49.218:65146
+10:40:24.393 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[YDXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+10:48:30.694 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.668 m
+10:51:03.950 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[YDXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.218:65146
+10:58:30.670 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.556 m
+11:08:30.687 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.473 m
+11:18:30.691 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.414 m
+11:28:30.660 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.419 m
+11:29:44.045 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[JYHDQ-WLV-P01-001-02]客户端连接: 79.124.49.202:3025
+11:29:44.045 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[JYHDQ-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+11:36:02.799 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[JYHDQ-WLV-P01-001-02]客户端连接已关闭: 79.124.49.202:3025
+11:38:30.668 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.26 m
+11:48:30.703 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.222 m
+11:58:23.067 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNDA5MzV9.HzbY1wUOLS0k95DeYqwJu3I-I-49Qo1ngQWF879NJ8DRTR0fvq7a3yLaKLA2HN3C5Hxzyk1bUlZPPA6SQet9MQ
+11:58:30.660 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.204 m
+11:59:22.664 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+11:59:22.856 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNDA5OTV9.NsP_GWWi45_KGdSsiMnLwERdThMD5w2zOm3WvBGjJ-5ejFWlBtQEliwrXN521-kRVVq_79_yWDWNXASsAy4YTA
+11:59:22.856 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+12:08:30.774 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.135 m
+12:18:30.659 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.079 m
+12:28:30.678 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.024 m
+12:28:31.391 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[CBXH-WLV-P01-001-02]客户端连接: 79.124.49.202:64136
+12:28:31.391 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[CBXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+12:36:45.673 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[ZYXH-WLV-P01-001-02]客户端连接: 79.124.49.218:64824
+12:36:45.673 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[ZYXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+12:38:30.685 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.994 m
+12:38:31.623 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[CBXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.202:64136
+12:46:45.876 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[ZYXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.218:64824
+12:48:30.684 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.941 m
+12:58:30.703 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.913 m
+13:08:30.663 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.892 m
+13:18:23.056 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNDU3MzV9.drmtgsmHQBCKqBN7I_1ltJER7G5a0NxlQIyfMPYMTOvZvoVt9eD6VSVhJwVr4561DzFniiAHV9sMPdUn1aUa0g
+13:18:30.661 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.837 m
+13:19:22.671 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+13:19:22.869 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNDU3OTV9.8ql8hcrSmQo_0MHLz_B8xWeYThxsosZkdPWXZGP9X6husrFJ9OD2eEFMp5g08E6bvTrmjTRdnDRp3kIt5baHaQ
+13:19:22.869 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+13:28:30.692 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.863 m
+13:38:30.677 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.839 m
+13:48:30.697 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.867 m
+13:58:30.702 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.852 m
+14:08:30.702 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.75 m
+14:18:30.688 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.839 m
+14:28:30.725 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.918 m
+14:38:23.017 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNTA1MzV9.aHMBzT3qVPhkh8P5pwnEjAT59du3J0u8uGA-aoLD2Kz0ITkDpjxg30KTo9eMDf5eVwXObOUiyXDVo-N-zko2lA
+14:38:30.723 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.954 m
+14:39:22.666 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+14:39:22.844 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNTA1OTV9.v7RxMenFlvXlfB_94yzte2Fyi2lEw6svOHRLdzCLlrnTLCwcTLmBi5j1n_igZPhkzAho9O5IVUI1kSf5ykDOHw
+14:39:22.844 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+14:48:30.691 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 17.939 m
+14:58:30.700 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.047 m
+15:08:30.717 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.089 m
+15:18:30.680 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.127 m
+15:28:30.667 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.187 m
+15:38:30.674 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.255 m
+15:48:30.679 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.353 m
+15:58:23.047 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNTUzMzV9.Ca4GS825tkrvT-3MspL12sEYGBrPb8p_t0xvgr-LlFSQh6j-5VlPVRraC0luRGF5o_bf8aXaMvunkgprhrUF_g
+15:58:30.692 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.422 m
+15:59:22.671 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+15:59:22.856 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNTUzOTV9.QJuFU9b8ZTKt9gf_RDwSDo2wTTIuHGlcE_opU0Vr5O7Zw5D9kPnxIPxKjswsvwF1_bJErsVdR3JlXrNxlohZTw
+15:59:22.856 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+16:08:30.719 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.503 m
+16:18:30.697 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.591 m
+16:28:30.654 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.659 m
+16:38:30.683 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.748 m
+16:48:30.667 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.846 m
+16:58:30.820 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.94 m
+17:08:30.698 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.018 m
+17:18:23.055 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjAxMzV9.aupcoq-iFNM3febbBqUBUYm3OLQdbc4PGLc5yUi9kXfDJxFdzr53qIStPYMaUbEJ3PJPgExGNPWJlzKf69F3AQ
+17:18:30.667 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.094 m
+17:19:22.677 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+17:19:22.865 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjAxOTV9.qqG13EhTlbYYM_ztOkUaxCAM_SvPCLmBRkXXcTCfC11b0QbmAddIeI_sRgDGsh2fG6E2VPJyHW8XR2I6Obs7zQ
+17:19:22.865 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+17:28:30.652 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.178 m
+17:38:30.671 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.239 m
+17:48:30.698 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.324 m
+17:58:30.808 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.407 m
+18:08:30.723 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.49 m
+18:18:30.683 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.558 m
+18:28:30.692 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.609 m
+18:38:23.081 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjQ5MzV9.OeVYpPVRNgDyW8I71rs2ynp-_ylPPMPa4Fsb7G8RrK_WSUxk1VzIAMhLfwA4sNRJwtbTlNUv3I1Un1lk6CGCAw
+18:38:30.694 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.678 m
+18:39:22.678 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+18:39:22.894 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjQ5OTV9.m9UYxkUUXKtAFFE-U5KGLQ1qUwxQZZOUE4Y7OlS7nlnvnVTDU0ZraxYjOznQfwftJV9oYFwVa-lUmdyUdYmxLA
+18:39:22.895 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+18:48:30.675 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.752 m
+18:58:30.682 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.799 m
+19:08:30.717 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.857 m
+19:18:31.011 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.904 m
+19:28:30.702 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.936 m
+19:38:30.712 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.998 m
+19:48:30.725 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.034 m
+19:58:23.055 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjk3MzV9.sS_k6LjLsDN-qojiwEF3avxYzetRMKI6tc2b1PrHo0cq7yFgfSwH4lf_U8LoEhRwnt-N3-YsYEaIe9W2hkxTMw
+19:58:30.677 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.056 m
+19:59:22.677 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+19:59:22.865 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNjk3OTV9.wzf7XBOOi_wDRFECllysy1Pz8fRjneJ5dRaXCvWX_R-uMx1pe4mezCa0BVOkbGyqxBlqWJsBG-xv8IekUbpDyA
+19:59:22.866 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+20:08:30.689 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.064 m
+20:18:30.816 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.089 m
+20:28:30.676 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.093 m
+20:38:30.675 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.115 m
+20:48:30.698 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.096 m
+20:58:31.135 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.067 m
+21:08:30.796 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.042 m
+21:18:23.063 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNzQ1MzV9.y3cmA0skwSWTf77pLgky_sqgT0_Iffu_Z-N9uEUAeKEGct0svvntMxpsEBH2BDiNCWhmBk422pBMLf8LMn_H_A
+21:18:30.702 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 20.014 m
+21:19:22.692 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+21:19:22.887 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNzQ1OTV9.FKr2goEflCxy5t3c4yJwByutUGGZeiaN4elSmwlA8QvXfe-xkLrvHO5QviqCb6uf9pyUxXeFUmLF0mSePfirzA
+21:19:22.887 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+21:28:30.683 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.959 m
+21:38:30.707 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.903 m
+21:48:30.693 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.849 m
+21:58:30.687 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.771 m
+22:08:30.712 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.687 m
+22:18:30.715 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.59 m
+22:28:30.698 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.498 m
+22:38:23.055 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNzkzMzV9.PfeIV3hgMGWUHycvY9G3Ll3htrycHUjbec64xpqs6c-PbWfppG1ghIBK_3C6pWMz2j5RAC-6gu6BAcInEomoww
+22:38:30.679 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.395 m
+22:39:22.680 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+22:39:22.867 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyNzkzOTV9.IU1UhKrMnl0ejburPsnUdG0BT3GldPXr5LaqqcbckO4Amfv8R6Upjpe5zKUYSAAZ60ELFY50AKLEWD44RSGMkA
+22:39:22.867 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功
+22:48:30.682 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.287 m
+22:58:30.677 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.175 m
+23:08:30.693 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 19.079 m
+23:18:30.805 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.977 m
+23:19:57.199 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleConnection,124] - 设备[CBXH-WLV-P01-001-02]客户端连接: 79.124.49.214:64983
+23:19:57.199 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [startSendTimer,176] - 设备[CBXH-WLV-P01-001-02]启动定时发送任务,间隔: 600000ms
+23:28:30.696 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.891 m
+23:29:57.433 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleClose,214] - 设备[CBXH-WLV-P01-001-02]客户端连接已关闭: 79.124.49.214:64983
+23:38:30.731 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.785 m
+23:48:30.701 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.692 m
+23:58:23.059 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyODQxMzV9.6qZ86_0rgvPDt_5CC_wXZYleyO7ffxepSjkfw4CL4u7T39rE8Yb37SGQAw5BO0_0jDfXXc0KhUvsZf8hU9iFUQ
+23:58:30.697 [vert.x-eventloop-thread-0] INFO  c.z.s.s.SingleDeviceRadarWaterLevelServer - [handleData,197] - 设备[DLJH-WLV-P01-001-02]当前水位: 18.6 m
+23:59:22.683 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,153] - 开始自动刷新倾角传感器 API Token...
+23:59:22.871 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [login,77] - 登录成功，Token: eyJhbGciOiJIUzUxMiJ9.eyJyb2xlX2xvZ2luIjoiW2Rvc29tZXRoaW5nXSIsInN1YiI6ImR4a2oiLCJleHAiOjE3NjQyODQxOTV9.R4ILgBBvIfV-1j7TgMhpEjVd3M35NIO6oQujB5jeMcY-T_8Ap-INzy7t1GTqFGTb88lX5oaYj5HVENLhdtzKDg
+23:59:22.871 [scheduling-1] INFO  c.z.s.s.i.InclineApiService - [refreshTokenScheduled,157] - 倾角传感器 API Token 刷新成功

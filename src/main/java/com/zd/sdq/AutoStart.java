@@ -9,11 +9,9 @@ import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.MqttClientConfigEntity;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
 import com.zd.sdq.mapper.MqttConfigEntityMapper;
-import com.zd.sdq.service.incline.InclineApiService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,7 +25,6 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class AutoStart implements CommandLineRunner {
-    private final InclineApiService inclineApiService;
     private final MqttConfigEntityMapper mqttConfigEntityMapper;
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceInfoExtMapper deviceInfoExtMapper;
@@ -44,15 +41,10 @@ public class AutoStart implements CommandLineRunner {
         }
 
         // 加载设备信息到服务器中
-        deviceInfoExtMapper.selectList(new LambdaQueryWrapper<DeviceInfoExt>().eq(DeviceInfo::isEnable, 1)).forEach(deviceInfoExt -> {
-            deviceInfoManager.registerDevice(deviceInfoExt, deviceInfoExt.getMqttGatewayId());
-        });
-    }
-
-    // 根据配置文件的间隔时间，自动刷新Token， 计算方式为 配置文件的间隔时间 * 60_000 
-    @Scheduled(fixedRateString = "#{${incline.api.token-refresh-interval} * 60000}")
-    public void refreshTokenScheduled() {
-        inclineApiService.refreshToken();
+        deviceInfoExtMapper
+                .selectList(new LambdaQueryWrapper<DeviceInfoExt>().eq(DeviceInfo::isEnable, 1))
+                .forEach(deviceInfoExt ->
+                    deviceInfoManager.registerDevice(deviceInfoExt, deviceInfoExt.getMqttGatewayId()));
     }
 
 }

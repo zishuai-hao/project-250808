@@ -1,9 +1,15 @@
 package com.zd.sdq.service;
 
+import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.NumberUtil;
+import com.company.cbf.starter.data.entity.MqttData;
 import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
+import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
+import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
+import com.zd.sdq.mapper.DeviceInfoExtMapper;
+import com.zd.sdq.service.incline.InclineDataHandler;
 import com.zd.sdq.util.ModbusRtuUtil;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -11,6 +17,7 @@ import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetSocket;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -30,6 +37,7 @@ public class SingleDeviceRadarWaterLevelServer {
     private final int port;
     private final String deviceAddress;
     private final int sendIntervalMs;
+    private final DeviceInfoExtMapper deviceMapper;
 
     private NetServer netServer;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -37,20 +45,22 @@ public class SingleDeviceRadarWaterLevelServer {
     private NetSocket currentSocket;
     private final AtomicLong lastDataTime = new AtomicLong(0);
 
+
     /**
      * 构造函数
      * @param deviceInfo 设备信息
      * @param mqttAdapter MQTT适配器
      * @param vertx Vert.x实例
      */
-    public SingleDeviceRadarWaterLevelServer(DeviceInfoExt deviceInfo, 
-                                            BufferForwardMqttClientAdapter mqttAdapter,
-                                            Vertx vertx) {
+    public SingleDeviceRadarWaterLevelServer(DeviceInfoExt deviceInfo,
+                                             BufferForwardMqttClientAdapter mqttAdapter,
+                                             Vertx vertx, DeviceInfoExtMapper deviceMapper) {
         this.deviceInfo = deviceInfo;
         this.mqttAdapter = mqttAdapter;
         this.vertx = vertx;
         this.port = Integer.parseInt(deviceInfo.getPort());
         this.deviceAddress = deviceInfo.getRemoteDeviceId();
+        this.deviceMapper = deviceMapper;
         // frequency是秒,转换为毫秒
         int frequency = Integer.parseInt(deviceInfo.getFrequency());
         this.sendIntervalMs = frequency * 1000;
@@ -73,11 +83,15 @@ public class SingleDeviceRadarWaterLevelServer {
                         running.set(true);
                         log.info("设备[{}]的雷达水位仪TCP服务器启动成功,监听端口: {}, 设备地址: {}, 发送间隔: {}ms",
                                 deviceInfo.getDeviceCode(), port, deviceAddress, sendIntervalMs);
+
                     } else {
                         log.error("设备[{}]的雷达水位仪TCP服务器启动失败: {}",
                                 deviceInfo.getDeviceCode(), res.cause().getMessage(), res.cause());
                     }
                 });
+
+        // 启动定时发送任务
+        startSendTimer();
     }
 
     /**
@@ -130,46 +144,65 @@ public class SingleDeviceRadarWaterLevelServer {
         }
 
         currentSocket = socket;
+        // 更新最后数据时间为当前时间(连接建立时)
+        lastDataTime.set(System.currentTimeMillis());
 
         // 设置连接处理器
         socket.handler(this::handleData)
                 .closeHandler(v -> handleClose(clientAddress))
                 .exceptionHandler(e -> handleException(clientAddress, e));
+        
 
-        // 启动定时发送任务
-        startSendTimer(socket);
     }
 
     /**
-     * 启动定时发送任务
+     * 启动定时发送任务(仅启动一次)
      */
-    private void startSendTimer(NetSocket socket) {
-        // 取消之前的定时器
+    private void startSendTimer() {
+        // 如果定时器已存在,不重复创建
         if (sendTimerId != null) {
-            vertx.cancelTimer(sendTimerId);
+            log.debug("设备[{}]定时发送任务已存在,无需重复创建", deviceInfo.getDeviceCode());
+            return;
         }
 
-        // 创建新的定时器
+        // 创建定时器
         sendTimerId = vertx.setPeriodic(sendIntervalMs, id -> {
-            if (running.get() && socket != null && !socket.writeQueueFull()) {
-                try {
-                    // 构造并发送 Modbus 读保持寄存器请求
-                    byte[] query = ModbusRtuUtil.buildReadRequest(deviceAddress, 0x0001, 0x0001);
-                    Buffer buffer = Buffer.buffer(query);
-                    
-                    socket.write(buffer, res -> {
-                        if (res.succeeded()) {
-                            log.debug("设备[{}]发送查询水位指令: {}", 
-                                    deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(query));
-                        } else {
-                            log.error("设备[{}]发送指令失败: {}", 
-                                    deviceInfo.getDeviceCode(), res.cause().getMessage());
-                        }
-                    });
-                } catch (Exception e) {
-                    log.error("设备[{}]构造Modbus请求失败: {}", 
-                            deviceInfo.getDeviceCode(), e.getMessage(), e);
-                }
+            // 检查服务器是否运行
+            if (!running.get()) {
+                log.warn("设备[{}]服务器未运行,跳过本次发送", deviceInfo.getDeviceCode());
+                return;
+            }
+
+            // 检查客户端连接状态
+            NetSocket socket = currentSocket;
+            if (socket == null) {
+                log.warn("设备[{}]无客户端连接,跳过本次发送", deviceInfo.getDeviceCode());
+                return;
+            }
+
+            // 检查写队列是否已满
+            if (socket.writeQueueFull()) {
+                log.warn("设备[{}]写队列已满,跳过本次发送", deviceInfo.getDeviceCode());
+                return;
+            }
+
+            try {
+                // 构造并发送 Modbus 读保持寄存器请求
+                byte[] query = ModbusRtuUtil.buildReadRequest(deviceAddress, 0x0001, 0x0001);
+                Buffer buffer = Buffer.buffer(query);
+                
+                socket.write(buffer, res -> {
+                    if (res.succeeded()) {
+                        log.debug("设备[{}]发送查询水位指令: {}", 
+                                deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(query));
+                    } else {
+                        log.error("设备[{}]发送指令失败: {}", 
+                                deviceInfo.getDeviceCode(), res.cause().getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                log.error("设备[{}]构造Modbus请求失败: {}", 
+                        deviceInfo.getDeviceCode(), e.getMessage(), e);
             }
         });
 
@@ -192,7 +225,7 @@ public class SingleDeviceRadarWaterLevelServer {
 
             // CRC 校验
             if (!ModbusRtuUtil.verifyCrc(data)) {
-                log.warn("设备[{}]响应CRC校验失败", deviceInfo.getDeviceCode());
+                log.warn("设备[{}]响应CRC校验失败:{}", deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(data));
                 return;
             }
 
@@ -218,14 +251,15 @@ public class SingleDeviceRadarWaterLevelServer {
      */
     private void handleClose(String clientAddress) {
         log.info("设备[{}]客户端连接已关闭: {}", deviceInfo.getDeviceCode(), clientAddress);
-        
-        // 取消定时发送任务
-        if (sendTimerId != null) {
-            vertx.cancelTimer(sendTimerId);
-            sendTimerId = null;
-        }
-        
+        DeviceInfoExt deviceInfoExt = new DeviceInfoExt();
+        deviceInfoExt.setId(deviceInfo.getId());
+        deviceInfoExt.setEnable(true);
+        deviceInfoExt.setLastConnectTime(DateUtil.now());
+        deviceMapper.updateById(deviceInfoExt);
+        // 清空当前连接和最后数据时间
         currentSocket = null;
+        lastDataTime.set(0);
+        // 注意: 不取消定时任务,定时任务会检查连接状态并跳过发送
     }
 
     /**
@@ -249,7 +283,6 @@ public class SingleDeviceRadarWaterLevelServer {
                 return null;
             }
             // 基本帧: 地址(1) 功能码(1) 字节数(1) 数据(2) CRC(2)
-            byte addr = resp[0];
             byte func = resp[1];
             int byteCount = resp[2] & 0xFF;
             if (func != 0x03 || byteCount != 0x02) {
@@ -271,12 +304,24 @@ public class SingleDeviceRadarWaterLevelServer {
      */
     private void forwardDataToMqtt(Double waterLevel) {
         try {
-            double diff = deviceInfo.getBaseline() - waterLevel;
-
-            // 通过BufferForwardMqttClientAdapter转发数据
-            mqttAdapter.push(deviceInfo.getDeviceCode(), Collections.singletonList(Collections.singletonList(NumberUtil.roundStr(diff, 3))));
+            // 检查baseline是否为null(虽然在启动时已验证,但为了安全再次检查)
+            Double baseline = deviceInfo.getBaseline();
+            if (baseline == null) {
+                log.error("设备[{}]基线值为空,无法计算差值,跳过转发", deviceInfo.getDeviceCode());
+                return;
+            }
             
-            log.debug("设备[{}]数据已转发到MQTT: {} m", deviceInfo.getDeviceCode(), waterLevel);
+            double diff = baseline - waterLevel;
+            MqttData build = new MqttDataBuilder(DeviceType.WLV)
+                    .monitoringCode(deviceInfo.getDeviceCode())
+                    .currentTime()
+                    .addData(LocalDateTime.now().atZone(InclineDataHandler.zoneId), Collections.singletonList(NumberUtil.roundStr(diff, 4)))
+                    .build();
+            // 通过BufferForwardMqttClientAdapter转发数据
+            mqttAdapter.push(deviceInfo.getDeviceCode(), build.getValue());
+            
+            log.debug("设备[{}]数据已转发到MQTT - 原始水位: {} m, 基线: {} m, 差值: {} m", 
+                    deviceInfo.getDeviceCode(), waterLevel, baseline, diff);
         } catch (Exception e) {
             log.error("设备[{}]转发数据到MQTT失败: {}", deviceInfo.getDeviceCode(), e.getMessage(), e);
         }

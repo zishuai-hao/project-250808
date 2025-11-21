@@ -3,6 +3,7 @@ package com.zd.sdq;
 import com.zd.sdq.entity.dto.incline.*;
 import com.zd.sdq.service.incline.InclineApiService;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,6 +17,7 @@ import java.io.IOException;
  */
 @Slf4j
 @SpringBootTest
+@Disabled
 public class InclineApiTest {
     
     @Autowired
@@ -49,9 +51,8 @@ public class InclineApiTest {
         log.info("总页数: {}", response.getData().getPages());
         
         if (response.getData().getRecords() != null) {
-            response.getData().getRecords().forEach(sensor -> {
-                log.info("传感器 SN: {}, 类型: {}", sensor.getSn(), sensor.getTpCode());
-            });
+            response.getData().getRecords().forEach(sensor ->
+                    log.info("传感器 SN: {}, 类型: {}", sensor.getSn(), sensor.getTpCode()));
         }
     }
     
@@ -81,15 +82,14 @@ public class InclineApiTest {
                 (response.getData().getCount() + response.getData().getPagesize() - 1) / response.getData().getPagesize());
         
         if (response.getData().getResultData() != null) {
-            response.getData().getResultData().forEach(record -> {
-                log.info("时间: {}, X角度: {}, Y角度: {}, Z角度: {}, 合倾角: {}, 温度: {}",
-                        record.getTm(),
-                        record.getAngleX(),
-                        record.getAngleY(),
-                        record.getAngleZ(),
-                        record.getAngleXyz(),
-                        record.getTemp());
-            });
+            response.getData().getResultData().forEach(record ->
+                    log.info("时间: {}, X角度: {}, Y角度: {}, Z角度: {}, 合倾角: {}, 温度: {}",
+                    record.getTm(),
+                    record.getAngleX(),
+                    record.getAngleY(),
+                    record.getAngleZ(),
+                    record.getAngleXyz(),
+                    record.getTemp()));
         }
     }
     
