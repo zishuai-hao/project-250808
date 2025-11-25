@@ -119,9 +119,9 @@
 
     <!-- 自定义topic 使用滚动文件Appender -->
     <appender name="httpData" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!--只输出INFO以及以上的日志-->
+        <!--只输出DEBUG以及以上的日志-->
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
+            <level>DEBUG</level>
         </filter>
         <file>${log.path}/http-data.log</file>
         <!-- 滚动记录文件，先将日志记录到指定文件，当符合某个条件时，将日志记录到其他文件。-->
@@ -138,20 +138,14 @@
 
     </appender>
 
-	<!-- 系统模块日志级别控制  -->
-	<logger name="com.zd" level="info" />
-	<!-- Spring日志级别控制  -->
-	<logger name="org.springframework" level="warn" />
-
-    <logger name="httpDataLog" level="info" >
+    <!-- HTTP数据日志 - 使用独立的 appender，不继承 root -->
+    <logger name="httpDataLog" additivity="false">
         <appender-ref ref="httpData" />
     </logger>
 
-	
-	<!--系统操作日志-->
-    <root level="debug">
+	<!--系统操作日志 - 日志级别完全由 application.yml 控制-->
+    <root>
         <appender-ref ref="console" />
-        <appender-ref ref="file_debug" />
         <appender-ref ref="file_info" />
         <appender-ref ref="file_warn" />
         <appender-ref ref="file_error" />

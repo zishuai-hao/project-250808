@@ -1,8 +1,10 @@
 logging:
   level:
-    com.zd: debug
-    com.company: debug
+    root: info  # 根日志级别，控制所有未明确指定的日志
+    com.zd: info
+    com.company: info
     org.springframework: warn
+    httpDataLog: debug  # HTTP数据日志级别
 
 spring:
   datasource:
