@@ -1,4 +1,7 @@
 /output/**
 /log/**
 /.flattened-pom.xml
-/target/**
+target
+/.idea/copilotDiffState.xml
+/project-250808.iml
+/target/

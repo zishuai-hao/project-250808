@@ -9,6 +9,8 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +28,11 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class InclineApiService {
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    
+    /**
+     * HTTP 数据日志记录器
+     */
+    private static final Logger httpDataLog = LoggerFactory.getLogger("httpDataLog");
 
     private final InclineApiConfig config;
     private  OkHttpClient httpClient;
@@ -62,13 +69,21 @@ public class InclineApiService {
                 .post(body)
                 .build();
         
+        // 记录HTTP请求
+        httpDataLog.info("登录请求 - URL: {}, 请求体: {}", config.getLoginUrl(), json);
+        
         try (Response response = httpClient.newCall(httpRequest).execute()) {
             if (!response.isSuccessful()) {
+                httpDataLog.error("登录请求失败 - 状态码: {}, 响应: {}", response.code(), response);
                 throw new IOException("登录失败: " + response);
             }
 
             assert response.body() != null;
             String responseBody = response.body().string();
+            
+            // 记录HTTP响应
+            httpDataLog.info("登录响应 - 状态码: {}, 响应体: {}", response.code(), responseBody);
+            
             LoginResponse loginResponse = objectMapper.readValue(responseBody, LoginResponse.class);
             
             // 保存 token
@@ -101,13 +116,21 @@ public class InclineApiService {
                 .post(body)
                 .build();
         
+        // 记录HTTP请求
+        httpDataLog.info("获取传感器列表请求 - URL: {}, 请求体: {}", config.getSensorListUrl(), json);
+        
         try (Response response = httpClient.newCall(httpRequest).execute()) {
             if (!response.isSuccessful()) {
+                httpDataLog.error("获取传感器列表失败 - 状态码: {}, 响应: {}", response.code(), response);
                 throw new IOException("获取传感器列表失败: " + response);
             }
 
             assert response.body() != null;
             String responseBody = response.body().string();
+            
+            // 记录HTTP响应
+            httpDataLog.info("获取传感器列表响应 - 状态码: {}, 响应体: {}", response.code(), responseBody);
+            
             return objectMapper.readValue(responseBody, SensorListResponse.class);
         }
     }
@@ -132,13 +155,21 @@ public class InclineApiService {
                 .post(body)
                 .build();
         
+        // 记录HTTP请求
+        httpDataLog.info("获取历史数据请求 - URL: {}, 请求体: {}", config.getHistoryDataUrl(), json);
+        
         try (Response response = httpClient.newCall(httpRequest).execute()) {
             if (!response.isSuccessful()) {
+                httpDataLog.error("获取历史数据失败 - 状态码: {}, 响应: {}", response.code(), response);
                 throw new IOException("获取历史数据失败: " + response);
             }
 
             assert response.body() != null;
             String responseBody = response.body().string();
+            
+            // 记录HTTP响应
+            httpDataLog.info("获取历史数据响应 - 状态码: {}, 响应体: {}", response.code(), responseBody);
+            
             return objectMapper.readValue(responseBody, InclineHistoryResponse.class);
         }
     }

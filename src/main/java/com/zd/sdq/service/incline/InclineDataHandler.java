@@ -197,19 +197,20 @@ public class InclineDataHandler {
             return;
         }
 
-        Date maxRecordTime = null;
         for (InclineHistoryResponse.InclineRecord record : records) {
             log.debug("远程设备[{}]数据: {}", remoteDeviceId, record.getTm());
+            // 解析记录时间
+            Date recordTime = DateUtil.parse(record.getTm());
 
-            // 记录最大时间
-            try {
-                Date tm = DateUtil.parse(record.getTm());
-                if (maxRecordTime == null || tm.after(maxRecordTime)) {
-                    maxRecordTime = tm;
-                }
-            } catch (Exception parseEx) {
-                log.warn("解析时间[{}]失败，已跳过该条记录", record.getTm());
+            // 过滤重复数据：只处理时间大于 lastTime 的数据
+            if (!recordTime.after(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId))) {
+                log.debug("远程设备[{}]数据时间[{}]小于等于上次处理时间[{}]，跳过", 
+                        remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
+                continue;
             }
+            remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
+            log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
+            
             ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
 
             // 将远程传感器的数据分配到两个本地设备中
@@ -243,12 +244,6 @@ public class InclineDataHandler {
                     log.warn("设备[{}]类型[{}]不支持", device.getDeviceCode(), device.getDeviceType());
                 }
             }
-        }
-
-        // 更新该远程设备的最新数据时间
-        if (maxRecordTime != null) {
-            remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, maxRecordTime);
-            log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(maxRecordTime));
         }
     }
 

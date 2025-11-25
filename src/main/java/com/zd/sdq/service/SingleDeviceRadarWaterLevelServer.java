@@ -14,11 +14,14 @@ import com.zd.sdq.util.ModbusRtuUtil;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.net.NetServer;
+import io.vertx.core.net.NetServerOptions;
 import io.vertx.core.net.NetSocket;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,7 +45,8 @@ public class SingleDeviceRadarWaterLevelServer {
     private NetServer netServer;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Long sendTimerId;
-    private NetSocket currentSocket;
+    // 使用Map存储多个客户端连接
+    private final Map<String, NetSocket> connectedSockets = new ConcurrentHashMap<>();
     private final AtomicLong lastDataTime = new AtomicLong(0);
 
 
@@ -75,7 +79,9 @@ public class SingleDeviceRadarWaterLevelServer {
             return;
         }
 
-        netServer = vertx.createNetServer();
+        netServer = vertx.createNetServer(new NetServerOptions()
+                .setTcpKeepAlive(true)
+                .setIdleTimeout(0));
 
         netServer.connectHandler(this::handleConnection)
                 .listen(port, res -> {
@@ -111,11 +117,13 @@ public class SingleDeviceRadarWaterLevelServer {
             sendTimerId = null;
         }
 
-        // 关闭当前连接
-        if (currentSocket != null) {
-            currentSocket.close();
-            currentSocket = null;
+        // 关闭所有连接
+        for (NetSocket socket : connectedSockets.values()) {
+            if (socket != null) {
+                socket.close();
+            }
         }
+        connectedSockets.clear();
 
         // 关闭服务器
         if (netServer != null) {
@@ -135,24 +143,16 @@ public class SingleDeviceRadarWaterLevelServer {
      */
     private void handleConnection(NetSocket socket) {
         String clientAddress = socket.remoteAddress().host() + ":" + socket.remoteAddress().port();
-        log.info("设备[{}]客户端连接: {}", deviceInfo.getDeviceCode(), clientAddress);
+        log.info("设备[{}]客户端连接: {}, 当前连接数: {}", 
+                deviceInfo.getDeviceCode(), clientAddress, connectedSockets.size() + 1);
 
-        // 如果已有连接,关闭旧连接
-        if (currentSocket != null) {
-            log.warn("设备[{}]已有连接,关闭旧连接", deviceInfo.getDeviceCode());
-            currentSocket.close();
-        }
-
-        currentSocket = socket;
-        // 更新最后数据时间为当前时间(连接建立时)
-        lastDataTime.set(System.currentTimeMillis());
+        // 将新连接添加到Map中
+        connectedSockets.put(clientAddress, socket);
 
         // 设置连接处理器
-        socket.handler(this::handleData)
+        socket.handler(buffer -> handleData(buffer, clientAddress))
                 .closeHandler(v -> handleClose(clientAddress))
                 .exceptionHandler(e -> handleException(clientAddress, e));
-        
-
     }
 
     /**
@@ -173,35 +173,40 @@ public class SingleDeviceRadarWaterLevelServer {
                 return;
             }
 
-            // 检查客户端连接状态
-            NetSocket socket = currentSocket;
-            if (socket == null) {
+            // 检查是否有客户端连接
+            if (connectedSockets.isEmpty()) {
                 log.warn("设备[{}]无客户端连接,跳过本次发送", deviceInfo.getDeviceCode());
                 return;
             }
 
-            // 检查写队列是否已满
-            if (socket.writeQueueFull()) {
-                log.warn("设备[{}]写队列已满,跳过本次发送", deviceInfo.getDeviceCode());
-                return;
-            }
-
             try {
-                // 构造并发送 Modbus 读保持寄存器请求
+                // 构造 Modbus 读保持寄存器请求
                 byte[] query = ModbusRtuUtil.buildReadRequest(deviceAddress, 0x0001, 0x0001);
                 Buffer buffer = Buffer.buffer(query);
                 
-                socket.write(buffer, res -> {
-                    if (res.succeeded()) {
-                        log.debug("设备[{}]发送查询水位指令: {}", 
-                                deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(query));
-                    } else {
-                        log.error("设备[{}]发送指令失败: {}", 
-                                deviceInfo.getDeviceCode(), res.cause().getMessage());
+                // 向所有连接的客户端发送查询指令
+                for (Map.Entry<String, NetSocket> entry : connectedSockets.entrySet()) {
+                    String clientAddr = entry.getKey();
+                    NetSocket socket = entry.getValue();
+                    
+                    if (socket == null || socket.writeQueueFull()) {
+                        log.debug("设备[{}]客户端[{}]写队列已满或连接无效,跳过", 
+                                deviceInfo.getDeviceCode(), clientAddr);
+                        continue;
                     }
-                });
+                    
+                    socket.write(buffer, res -> {
+                        if (res.succeeded()) {
+                            log.debug("设备[{}]向客户端[{}]发送查询水位指令: {}", 
+                                    deviceInfo.getDeviceCode(), clientAddr, HexUtil.encodeHexStr(query));
+                        } else {
+                            log.error("设备[{}]向客户端[{}]发送指令失败: {}",
+                                    deviceInfo.getDeviceCode(), clientAddr, res.cause().getMessage());
+                        }
+                    });
+                }
             } catch (Exception e) {
-                log.error("设备[{}]构造Modbus请求失败: {}", 
+                log.error("设备[{}]构造Modbus请求失败: {}",
                         deviceInfo.getDeviceCode(), e.getMessage(), e);
             }
         });
@@ -212,14 +217,16 @@ public class SingleDeviceRadarWaterLevelServer {
     /**
      * 处理接收到的数据
      */
-    private void handleData(Buffer buffer) {
+    private void handleData(Buffer buffer, String clientAddress) {
         try {
             byte[] data = buffer.getBytes();
-            log.debug("设备[{}]收到响应: {}", deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(data));
+            log.debug("设备[{}]从客户端[{}]收到响应: {}", 
+                    deviceInfo.getDeviceCode(), clientAddress, HexUtil.encodeHexStr(data));
 
             // 过滤设备活性消息 (FE开头的消息)
             if (data.length > 0 && (data[0] & 0xFF) == 0xFE) {
-                log.debug("设备[{}]收到活性消息,已过滤: {}", deviceInfo.getDeviceCode(), HexUtil.encodeHexStr(data));
+                log.debug("设备[{}]从客户端[{}]收到活性消息,已过滤: {}", 
+                        deviceInfo.getDeviceCode(), clientAddress, HexUtil.encodeHexStr(data));
                 return;
             }
 
@@ -229,11 +236,11 @@ public class SingleDeviceRadarWaterLevelServer {
                 return;
             }
 
-
             // 解析水位
             Double waterLevelMeter = parseModbusWaterLevel(data);
             if (waterLevelMeter != null) {
-                log.info("设备[{}]当前水位: {} m", deviceInfo.getDeviceCode(), waterLevelMeter);
+                log.info("设备[{}]从客户端[{}]解析到水位: {} m", 
+                        deviceInfo.getDeviceCode(), clientAddress, waterLevelMeter);
                 lastDataTime.set(System.currentTimeMillis());
                 
                 // 转发数据到MQTT
@@ -242,7 +249,8 @@ public class SingleDeviceRadarWaterLevelServer {
                 log.warn("设备[{}]无法从响应中解析水位", deviceInfo.getDeviceCode());
             }
         } catch (Exception e) {
-            log.error("设备[{}]处理数据失败: {}", deviceInfo.getDeviceCode(), e.getMessage(), e);
+            log.error("设备[{}]处理客户端[{}]数据失败: {}", 
+                    deviceInfo.getDeviceCode(), clientAddress, e.getMessage(), e);
         }
     }
 
@@ -250,15 +258,21 @@ public class SingleDeviceRadarWaterLevelServer {
      * 处理连接关闭
      */
     private void handleClose(String clientAddress) {
-        log.info("设备[{}]客户端连接已关闭: {}", deviceInfo.getDeviceCode(), clientAddress);
-        DeviceInfoExt deviceInfoExt = new DeviceInfoExt();
-        deviceInfoExt.setId(deviceInfo.getId());
-        deviceInfoExt.setEnable(true);
-        deviceInfoExt.setLastConnectTime(DateUtil.now());
-        deviceMapper.updateById(deviceInfoExt);
-        // 清空当前连接和最后数据时间
-        currentSocket = null;
-        lastDataTime.set(0);
+        log.info("设备[{}]客户端连接已关闭: {}, 剩余连接数: {}", 
+                deviceInfo.getDeviceCode(), clientAddress, connectedSockets.size() - 1);
+        
+        // 从Map中移除该连接
+        connectedSockets.remove(clientAddress);
+        
+        // 如果所有连接都关闭了,更新数据库并清空最后数据时间
+        if (connectedSockets.isEmpty()) {
+            DeviceInfoExt deviceInfoExt = new DeviceInfoExt();
+            deviceInfoExt.setId(deviceInfo.getId());
+            deviceInfoExt.setEnable(true);
+            deviceInfoExt.setLastConnectTime(DateUtil.now());
+            deviceMapper.updateById(deviceInfoExt);
+            lastDataTime.set(0);
+        }
         // 注意: 不取消定时任务,定时任务会检查连接状态并跳过发送
     }
 
