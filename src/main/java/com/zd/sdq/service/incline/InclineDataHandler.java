@@ -220,7 +220,8 @@ public class InclineDataHandler {
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.VIB);
                     builder.currentTime();
                     builder.monitoringCode(device.getDeviceCode());
-                    builder.addData(zonedDateTime, NumberUtil.roundStr(record.getAccMaxY(), 4));
+                    // 单位转换 mG -> m/ss
+                    builder.addData(zonedDateTime, NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
                     MqttData mqttData = builder.build();
 
                     // 发送数据到缓冲转发适配器

@@ -5,3 +5,6 @@ target
 /.idea/copilotDiffState.xml
 /project-250808.iml
 /target/
+/output_by_device/**
+/waterleveldata/**
+/water_level_data_all.csv
