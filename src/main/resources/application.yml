@@ -60,3 +60,6 @@ incline:
 server:
   port: 42009
 
+radar:
+  water:
+    enable: false

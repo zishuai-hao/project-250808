@@ -6,6 +6,7 @@ import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapt
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
+import com.zd.sdq.mapper.WaterLevelDataMapper;
 import io.vertx.core.Vertx;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -31,6 +32,7 @@ public class RadarWaterLevelServerManager {
     private final DeviceInfoExtMapper deviceInfoExtMapper;
     private final BufferForwardMqttClientAdapter mqttAdapter;
     private final Vertx vertx;
+    private final WaterLevelDataMapper  waterLevelDataMapper;
 
     /**
      *  存储所有运行中的TCP服务器，key为设备编码
@@ -99,6 +101,12 @@ public class RadarWaterLevelServerManager {
      * 启动单个设备的TCP服务器
      */
     public void startServer(DeviceInfoExt device) {
+        // 先进行空值检查，避免空指针
+        if (device == null) {
+            log.error("设备信息为空，无法启动TCP服务器");
+            return;
+        }
+
         String deviceCode = device.getDeviceCode();
         String port = device.getPort();
         
@@ -121,14 +129,15 @@ public class RadarWaterLevelServerManager {
                     deviceCode, port, occupyingDevice);
             return;
         }
-        
+
+        SingleDeviceRadarWaterLevelServer server = null;
         try {
             // 创建并启动TCP服务器
-            SingleDeviceRadarWaterLevelServer server = new SingleDeviceRadarWaterLevelServer(
-                    device, mqttAdapter, vertx, deviceInfoExtMapper);
+            server = new SingleDeviceRadarWaterLevelServer(
+                    device, mqttAdapter, vertx, deviceInfoExtMapper, waterLevelDataMapper);
             server.start();
-            
-            // 添加到管理列表
+
+            // 启动成功后才添加到管理列表
             serverMap.put(deviceCode, server);
             portMap.put(port, deviceCode);
             
@@ -137,7 +146,15 @@ public class RadarWaterLevelServerManager {
             
         } catch (Exception e) {
             log.error("启动设备[{}]的TCP服务器失败: {}", deviceCode, e.getMessage(), e);
-            // 启动失败时清理端口映射
+
+            // 启动失败时确保清理所有资源
+            if (server != null) {
+                try {
+                    server.stop();
+                } catch (Exception stopEx) {
+                    log.error("清理失败服务器资源时出错: {}", stopEx.getMessage());
+                }
+            }
             portMap.remove(port);
             throw e;
         }
@@ -174,6 +191,7 @@ public class RadarWaterLevelServerManager {
         
         // 查询条件: port和remote_device_id都不为空
         queryWrapper.isNotNull(DeviceInfoExt::getPort)
+                .eq(DeviceInfoExt::isEnable, 1)
                 .isNotNull(DeviceInfoExt::getRemoteDeviceId)
                 .eq(DeviceInfo::getDeviceType, DeviceType.WLV);
         

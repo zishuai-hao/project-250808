@@ -1,6 +1,7 @@
 package com.zd.sdq.service;
 
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.io.unit.DataUnit;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.NumberUtil;
 import com.company.cbf.starter.data.entity.MqttData;
@@ -8,7 +9,9 @@ import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapt
 import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
+import com.zd.sdq.entity.WaterLevelData;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
+import com.zd.sdq.mapper.WaterLevelDataMapper;
 import com.zd.sdq.service.incline.InclineDataHandler;
 import com.zd.sdq.util.ModbusRtuUtil;
 import io.vertx.core.Vertx;
@@ -41,6 +44,7 @@ public class SingleDeviceRadarWaterLevelServer {
     private final String deviceAddress;
     private final int sendIntervalMs;
     private final DeviceInfoExtMapper deviceMapper;
+    private final WaterLevelDataMapper waterLevelDataMapper;
 
     private NetServer netServer;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -58,13 +62,14 @@ public class SingleDeviceRadarWaterLevelServer {
      */
     public SingleDeviceRadarWaterLevelServer(DeviceInfoExt deviceInfo,
                                              BufferForwardMqttClientAdapter mqttAdapter,
-                                             Vertx vertx, DeviceInfoExtMapper deviceMapper) {
+                                             Vertx vertx, DeviceInfoExtMapper deviceMapper, WaterLevelDataMapper waterLevelDataMapper) {
         this.deviceInfo = deviceInfo;
         this.mqttAdapter = mqttAdapter;
         this.vertx = vertx;
         this.port = Integer.parseInt(deviceInfo.getPort());
         this.deviceAddress = deviceInfo.getRemoteDeviceId();
         this.deviceMapper = deviceMapper;
+        this.waterLevelDataMapper = waterLevelDataMapper;
         // frequency是秒,转换为毫秒
         int frequency = Integer.parseInt(deviceInfo.getFrequency());
         this.sendIntervalMs = frequency * 1000;
@@ -326,6 +331,9 @@ public class SingleDeviceRadarWaterLevelServer {
             }
             
             double diff = baseline - waterLevel;
+            // 保存至数据库
+            waterLevelDataMapper.insert(new WaterLevelData(null, deviceInfo.getDeviceCode(), diff, DateUtil.now(), DateUtil.now()));
+
             MqttData build = new MqttDataBuilder(DeviceType.WLV)
                     .monitoringCode(deviceInfo.getDeviceCode())
                     .currentTime()

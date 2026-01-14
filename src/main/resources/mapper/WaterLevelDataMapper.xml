@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zd.sdq.mapper.WaterLevelDataMapper">
+
+    <!-- 删除指定时间之前的数据 -->
+    <delete id="deleteByDataTimeBefore">
+        DELETE FROM water_level_data
+        WHERE data_time &lt; #{beforeTime}
+    </delete>
+
+</mapper>
+
