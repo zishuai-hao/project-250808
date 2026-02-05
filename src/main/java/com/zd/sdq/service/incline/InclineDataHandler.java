@@ -53,7 +53,7 @@ public class InclineDataHandler {
     /**
      * 查询间隔：5分钟
      */
-    private static final int QUERY_INTERVAL_MS = 5 * 60 * 1000;
+    private static final int QUERY_INTERVAL_MS = 2 * 60 * 1000;
 
     /**
      * 记录每个远程设备的最新数据时间
@@ -98,13 +98,29 @@ public class InclineDataHandler {
                 log.debug("初始化远程设备[{}]的最新数据时间: {}",
                         remoteDeviceId, DateUtil.formatDateTime(currentTime));
 
-                // vertx 定时器
+                // vertx 定时器 - 使用 executeBlocking 避免阻塞 Event Loop 线程
                 vertx.setPeriodic(delayMs, QUERY_INTERVAL_MS, id -> {
-                    InclineHistoryResponse response = fetchDeviceData(remoteDeviceId,
-                            DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)),
-                            DateUtil.formatDateTime(new Date()));
-                    // 处理响应数据
-                    processResponse(devices, response, remoteDeviceId);
+                    // 将阻塞的 HTTP 调用放到 Worker 线程池中执行
+                    vertx.executeBlocking(promise -> {
+                        try {
+                            log.debug("在 Worker 线程中查询远程设备[{}]数据", remoteDeviceId);
+                            InclineHistoryResponse response = fetchDeviceData(remoteDeviceId,
+                                    DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)),
+                                    DateUtil.formatDateTime(new Date()));
+                            promise.complete(response);
+                        } catch (Exception e) {
+                            log.error("查询远程设备[{}]数据时发生异常", remoteDeviceId, e);
+                            promise.fail(e);
+                        }
+                    }, false, res -> {
+                        // 在 Event Loop 线程中处理响应结果
+                        if (res.succeeded()) {
+                            InclineHistoryResponse response = (InclineHistoryResponse) res.result();
+                            processResponse(devices, response, remoteDeviceId);
+                        } else {
+                            log.error("远程设备[{}]数据查询失败", remoteDeviceId, res.cause());
+                        }
+                    });
                 });
             }
         } catch (Exception e) {
@@ -211,7 +227,9 @@ public class InclineDataHandler {
             remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
             log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
             
-            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
+//            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
+            // 使用当前时间作为标准
+            ZonedDateTime zonedDateTime = ZonedDateTime.now(zoneId);
 
             // 将远程传感器的数据分配到两个本地设备中
             for (DeviceInfoExt device : devices) {
