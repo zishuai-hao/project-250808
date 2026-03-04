@@ -22,8 +22,7 @@ import io.vertx.core.net.NetSocket;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -343,7 +342,10 @@ public class SingleDeviceRadarWaterLevelServer {
             MqttData build = new MqttDataBuilder(DeviceType.WLV)
                     .monitoringCode(deviceInfo.getDeviceCode())
                     .currentTime()
-                    .addData(LocalDateTime.now().atZone(InclineDataHandler.zoneId), Collections.singletonList(NumberUtil.roundStr(diff, 4)))
+                    .addData(
+                            LocalDateTime.now().atZone(InclineDataHandler.zoneId),
+                            List.of(NumberUtil.roundStr(diff, 4), NumberUtil.roundStr(waterLevel, 4))
+                    )
                     .build();
             // 通过BufferForwardMqttClientAdapter转发数据
             mqttAdapter.push(deviceInfo.getDeviceCode(), build.getValue());
@@ -354,7 +356,7 @@ public class SingleDeviceRadarWaterLevelServer {
             latestData.put("diff", NumberUtil.roundStr(diff, 4));
             latestData.put("unit", "m");
             deviceLatestDataCache.updateLatestData(deviceInfo, "RADAR_WATER_LEVEL_TCP", latestData, DateUtil.now());
-            
+
             log.debug("设备[{}]数据已转发到MQTT - 原始水位: {} m, 基线: {} m, 差值: {} m", 
                     deviceInfo.getDeviceCode(), waterLevel, baseline, diff);
         } catch (Exception e) {
