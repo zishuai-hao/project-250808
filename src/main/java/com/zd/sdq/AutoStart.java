@@ -9,6 +9,7 @@ import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.MqttClientConfigEntity;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
 import com.zd.sdq.mapper.MqttConfigEntityMapper;
+import com.zd.sdq.service.DeviceLatestDataCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -29,6 +30,7 @@ public class AutoStart implements CommandLineRunner {
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceInfoExtMapper deviceInfoExtMapper;
     private final DeviceInfoManager deviceInfoManager;
+    private final DeviceLatestDataCache deviceLatestDataCache;
 
     @Override
     public void run(String... args) {
@@ -43,8 +45,10 @@ public class AutoStart implements CommandLineRunner {
         // 加载设备信息到服务器中
         deviceInfoExtMapper
                 .selectList(new LambdaQueryWrapper<DeviceInfoExt>().eq(DeviceInfo::isEnable, 1))
-                .forEach(deviceInfoExt ->
-                    deviceInfoManager.registerDevice(deviceInfoExt, deviceInfoExt.getMqttGatewayId()));
+                .forEach(deviceInfoExt -> {
+                    deviceInfoManager.registerDevice(deviceInfoExt, deviceInfoExt.getMqttGatewayId());
+                    deviceLatestDataCache.registerDevice(deviceInfoExt);
+                });
     }
 
 }

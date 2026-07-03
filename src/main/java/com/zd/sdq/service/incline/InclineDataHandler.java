@@ -14,6 +14,7 @@ import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.dto.incline.InclineHistoryRequest;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
+import com.zd.sdq.service.DeviceLatestDataCache;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class InclineDataHandler {
     private final DeviceInfoExtMapper deviceInfoExtMapper;
     private final InclineApiService inclineApiService;
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
+    private final DeviceLatestDataCache deviceLatestDataCache;
 
     /**
      * HTTP-Client 网关类型标识
@@ -244,6 +246,12 @@ public class InclineDataHandler {
 
                     // 发送数据到缓冲转发适配器
                     bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
+                    Map<String, Object> latestData = new LinkedHashMap<>();
+                    latestData.put("accMaxZ", NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
+                    latestData.put("unit", "m/s2");
+                    latestData.put("alarmStatus", record.getAlarmStatus());
+                    latestData.put("runStatus", record.getRunStatus());
+                    deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
                 }
                 // 如果是 INC 设备，则发送角度数据和温度数据
                 else if (device.getDeviceType().equals(DeviceType.INC)) {
@@ -259,6 +267,15 @@ public class InclineDataHandler {
 
                     // 发送数据到缓冲转发适配器
                     bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
+                    Map<String, Object> latestData = new LinkedHashMap<>();
+                    latestData.put("angleX", NumberUtil.roundStr(record.getAngleX(), 6));
+                    latestData.put("angleY", NumberUtil.roundStr(record.getAngleY(), 6));
+                    latestData.put("temp", NumberUtil.roundStr(record.getTemp(), 3));
+                    latestData.put("angleUnit", "deg");
+                    latestData.put("tempUnit", "C");
+                    latestData.put("alarmStatus", record.getAlarmStatus());
+                    latestData.put("runStatus", record.getRunStatus());
+                    deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
                 } else {
                     log.warn("设备[{}]类型[{}]不支持", device.getDeviceCode(), device.getDeviceType());
                 }

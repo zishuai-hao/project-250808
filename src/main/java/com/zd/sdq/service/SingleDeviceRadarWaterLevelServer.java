@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,6 +46,7 @@ public class SingleDeviceRadarWaterLevelServer {
     private final int sendIntervalMs;
     private final DeviceInfoExtMapper deviceMapper;
     private final WaterLevelDataMapper waterLevelDataMapper;
+    private final DeviceLatestDataCache deviceLatestDataCache;
 
     private NetServer netServer;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -62,7 +64,10 @@ public class SingleDeviceRadarWaterLevelServer {
      */
     public SingleDeviceRadarWaterLevelServer(DeviceInfoExt deviceInfo,
                                              BufferForwardMqttClientAdapter mqttAdapter,
-                                             Vertx vertx, DeviceInfoExtMapper deviceMapper, WaterLevelDataMapper waterLevelDataMapper) {
+                                             Vertx vertx,
+                                             DeviceInfoExtMapper deviceMapper,
+                                             WaterLevelDataMapper waterLevelDataMapper,
+                                             DeviceLatestDataCache deviceLatestDataCache) {
         this.deviceInfo = deviceInfo;
         this.mqttAdapter = mqttAdapter;
         this.vertx = vertx;
@@ -70,6 +75,7 @@ public class SingleDeviceRadarWaterLevelServer {
         this.deviceAddress = deviceInfo.getRemoteDeviceId();
         this.deviceMapper = deviceMapper;
         this.waterLevelDataMapper = waterLevelDataMapper;
+        this.deviceLatestDataCache = deviceLatestDataCache;
         // frequency是秒,转换为毫秒
         int frequency = Integer.parseInt(deviceInfo.getFrequency());
         this.sendIntervalMs = frequency * 1000;
@@ -341,6 +347,13 @@ public class SingleDeviceRadarWaterLevelServer {
                     .build();
             // 通过BufferForwardMqttClientAdapter转发数据
             mqttAdapter.push(deviceInfo.getDeviceCode(), build.getValue());
+
+            Map<String, Object> latestData = new LinkedHashMap<>();
+            latestData.put("waterLevel", NumberUtil.roundStr(waterLevel, 4));
+            latestData.put("baseline", NumberUtil.roundStr(baseline, 4));
+            latestData.put("diff", NumberUtil.roundStr(diff, 4));
+            latestData.put("unit", "m");
+            deviceLatestDataCache.updateLatestData(deviceInfo, "RADAR_WATER_LEVEL_TCP", latestData, DateUtil.now());
             
             log.debug("设备[{}]数据已转发到MQTT - 原始水位: {} m, 基线: {} m, 差值: {} m", 
                     deviceInfo.getDeviceCode(), waterLevel, baseline, diff);

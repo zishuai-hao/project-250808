@@ -33,6 +33,7 @@ public class RadarWaterLevelServerManager {
     private final BufferForwardMqttClientAdapter mqttAdapter;
     private final Vertx vertx;
     private final WaterLevelDataMapper  waterLevelDataMapper;
+    private final DeviceLatestDataCache deviceLatestDataCache;
 
     /**
      *  存储所有运行中的TCP服务器，key为设备编码
@@ -134,7 +135,7 @@ public class RadarWaterLevelServerManager {
         try {
             // 创建并启动TCP服务器
             server = new SingleDeviceRadarWaterLevelServer(
-                    device, mqttAdapter, vertx, deviceInfoExtMapper, waterLevelDataMapper);
+                    device, mqttAdapter, vertx, deviceInfoExtMapper, waterLevelDataMapper, deviceLatestDataCache);
             server.start();
 
             // 启动成功后才添加到管理列表
