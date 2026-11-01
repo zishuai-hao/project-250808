@@ -39,7 +39,7 @@ class InclineBaselineForwardTest {
         InclineForwardDataService snapshots = mock(InclineForwardDataService.class);
         InclineDataHandler handler = new InclineDataHandler(null, null, null, cache,
                 new VibrationSpikeFilter(new VibrationFilterConfig()), snapshots, baselines,
-                new InclineFluctuationService(new InclineFluctuationConfig()));
+                new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
         Map<String, Date> cursor = (Map<String, Date>) ReflectionTestUtils.getField(handler,
                 "remoteDeviceIdLastDataTimeMap");
         DeviceInfoExt incline = device("TEST-INC", DeviceType.INC);

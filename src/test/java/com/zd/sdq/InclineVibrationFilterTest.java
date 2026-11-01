@@ -49,7 +49,7 @@ class InclineVibrationFilterTest {
     void setUp() {
         handler = new InclineDataHandler(null, null, null, cache,
                 new VibrationSpikeFilter(config, clock), archive, baselines,
-                new InclineFluctuationService(new InclineFluctuationConfig()));
+                new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
         Map<String, Date> lastTimes = lastTimes();
         lastTimes.put(SN, DateUtil.parse(START));
         vibration = device(CODE, DeviceType.VIB);
@@ -283,7 +283,7 @@ class InclineVibrationFilterTest {
         when(api.getLoginToken()).thenReturn("test-token");
         var queryHandler = new InclineDataHandler(null, null, api, cache,
                 new VibrationSpikeFilter(config, clock), archive, baselines,
-                new InclineFluctuationService(new InclineFluctuationConfig()));
+                new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
         queryHandler.fetchDeviceData(SN, TIME, "2026-11-01 04:00:00");
         var request = org.mockito.ArgumentCaptor.forClass(com.zd.sdq.entity.dto.incline.InclineHistoryRequest.class);
         verify(api).getHistoryData(request.capture());

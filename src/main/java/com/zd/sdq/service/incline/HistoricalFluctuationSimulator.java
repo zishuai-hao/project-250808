@@ -71,7 +71,7 @@ public class HistoricalFluctuationSimulator {
                     Point newer = history.get(history.size() - 1);
                     Duration gap = Duration.between(point.time(), newer.time());
                     if (gap.isNegative() || gap.isZero() || gap.compareTo(config.getMaxHistoryGap()) > 0
-                            || !sameBaseline(anchor, point)) break;
+                            || !sameBaseline(newer, point)) break;
                 }
                 history.add(point);
             }
@@ -96,8 +96,8 @@ public class HistoricalFluctuationSimulator {
             if (!raw.path("angleX").isNumber() || !raw.path("angleY").isNumber()) {
                 throw new IllegalArgumentException("缺少原始倾角，不能识别基准切换");
             }
-            // payload已经放大，需在同一角度域识别零点变化，不能将真实波动误认为每条都换了零点。
-            var amplified = inclineFluctuationService.apply(row.getDeviceCode(),
+            // 累加后的payload满足 k*raw-payload 为段内常数，不需要重放状态或再次放大入库值。
+            var amplified = inclineFluctuationService.historyReference(
                     raw.path("angleX").asDouble(), raw.path("angleY").asDouble());
             baseline = new double[]{amplified.x() - numbers[0], amplified.y() - numbers[1]};
             if (!Double.isFinite(baseline[0]) || !Double.isFinite(baseline[1])) {
@@ -110,7 +110,7 @@ public class HistoricalFluctuationSimulator {
     private boolean sameBaseline(Point anchor, Point point) {
         if (!anchor.zero().equals(point.zero())) return false;
         for (int d = 0; d < anchor.baseline().length; d++) {
-            // 原始值减六位小数上报值，允许两次舍入的误差。
+            // 比较相邻点的段内常数，允许6位小数的逐次舍入误差，不累积对比远端锚点。
             if (Math.abs(anchor.baseline()[d] - point.baseline()[d]) > 0.0000015) return false;
         }
         return true;

@@ -13,6 +13,14 @@ import java.util.List;
 @Mapper
 public interface InclineForwardDataMapper extends BaseMapper<InclineForwardData> {
     @Select("""
+            SELECT * FROM incline_forward_data
+            WHERE device_code = #{deviceCode} AND device_type = 'INC' AND data_time <= #{dataTime}
+            ORDER BY data_time DESC, id DESC LIMIT 1
+            """)
+    InclineForwardData selectPreviousIncline(@Param("deviceCode") String deviceCode,
+                                            @Param("dataTime") String dataTime);
+
+    @Select("""
             SELECT s.device_code, s.device_type, s.remote_device_id, d.mqtt_gateway_id, s.data_time, s.payload
             FROM incline_forward_data s
             JOIN s_device_info_ext d ON d.device_code = s.device_code

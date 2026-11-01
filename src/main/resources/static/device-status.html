@@ -399,10 +399,10 @@
     <form id="baseline-form">
         <h2 id="baseline-title">设置倾角基准</h2>
         <div id="baseline-device" class="device-code"></div>
-        <p class="muted">入库角度 = 固定中心 +（原始角度 − 固定中心）× 倍率 − 零点基准。放大未启用时使用原始角度扣零。保存后从下一条采集生效，历史记录保持原值。</p>
+        <p class="muted">先将原始角度扣零，首条直接入库；后续把前后两条扣零原始值的变化乘倍率，累加到上次入库值。按零点保持不变处理，历史记录保持原值。</p>
         <label>X 轴基准（°）<input id="baseline-x" type="number" step="any" required></label>
         <label>Y 轴基准（°）<input id="baseline-y" type="number" step="any" required></label>
-        <button id="baseline-use-current" type="button" class="secondary">使用最新角度设零点</button>
+        <button id="baseline-use-current" type="button" class="secondary">使用最新原始值</button>
         <p id="baseline-sample-time" class="muted"></p>
         <p id="baseline-error" class="error" role="alert"></p>
         <div class="baseline-actions">
@@ -503,15 +503,9 @@
 
     function currentZeroAngles(device) {
         const data = device?.latestData || {};
-        if (data.angleX === null || data.angleX === undefined || data.angleX === ""
-            || data.angleY === null || data.angleY === undefined || data.angleY === "") return null;
-        const zeroX = data.baselineApplied ? data.baselineX : 0;
-        const zeroY = data.baselineApplied ? data.baselineY : 0;
-        if (typeof zeroX !== "number" || !Number.isFinite(zeroX)
-            || typeof zeroY !== "number" || !Number.isFinite(zeroY)) return null;
-        const x = Number(data.angleX) + zeroX;
-        const y = Number(data.angleY) + zeroY;
-        return Number.isFinite(x) && Number.isFinite(y) ? {x, y} : null;
+        const x = data.rawAngleX, y = data.rawAngleY;
+        return typeof x === "number" && Number.isFinite(x) && typeof y === "number" && Number.isFinite(y)
+            ? {x, y} : null;
     }
 
     function openBaseline(deviceCode) {
@@ -524,7 +518,7 @@
         baselineFields.y.value = baseline?.angleY ?? "";
         baselineFields.error.textContent = "";
         baselineFields.sampleTime.textContent = angles
-            ? `可选扣零前角度，时间：${device.dataTime}（${device.statusText}）` : "暂无可用角度，可手动填写基准。";
+            ? `可选原始角度，时间：${device.dataTime}（${device.statusText}）` : "暂无可用角度，可手动填写基准。";
         baselineFields.useCurrent.disabled = !angles;
         baselineFields.remove.disabled = !baseline;
         baselineFields.dialog.showModal();
@@ -536,7 +530,7 @@
         if (angles) {
             baselineFields.x.value = angles.x;
             baselineFields.y.value = angles.y;
-            baselineFields.sampleTime.textContent = `已填写扣零前角度，时间：${device.dataTime}（${device.statusText}）`;
+            baselineFields.sampleTime.textContent = `已填写原始角度，时间：${device.dataTime}（${device.statusText}）`;
         }
     });
 

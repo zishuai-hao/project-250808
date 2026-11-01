@@ -231,7 +231,7 @@ public class InclineDataHandler {
 
             // 过滤重复数据：只处理时间大于 lastTime 的数据
             if (!recordTime.after(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId))) {
-                log.debug("远程设备[{}]数据时间[{}]小于等于上次处理时间[{}]，跳过", 
+                log.debug("远程设备[{}]数据时间[{}]小于等于上次处理时间[{}]，跳过",
                         remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
                 continue;
             }
@@ -250,31 +250,30 @@ public class InclineDataHandler {
                         log.warn("跳过无效倾角采集值，测点: {}，采集时间: {}", device.getDeviceCode(), record.getTm());
                         continue;
                     }
-                    var amplified = inclineFluctuationService.apply(
+                    var corrected = inclineBaselineService.apply(
                             device.getDeviceCode(), record.getAngleX(), record.getAngleY());
-                    InclineBaselineService.CorrectedAngles angles = inclineBaselineService.apply(
-                            device.getDeviceCode(), amplified.x(), amplified.y());
+                    var angles = inclineFluctuationService.apply(device, record, corrected);
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
                     builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
                     builder.monitoringCode(device.getDeviceCode());
                     builder.addData(
                             zonedDateTime,
-                            NumberUtil.roundStr(angles.angleX(), 6),
-                            NumberUtil.roundStr(angles.angleY(), 6),
+                            NumberUtil.roundStr(angles.x(), 6),
+                            NumberUtil.roundStr(angles.y(), 6),
                             NumberUtil.roundStr(record.getTemp(), 3));
                     MqttData mqttData = builder.build();
 
                     inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
                     Map<String, Object> latestData = new LinkedHashMap<>();
-                    latestData.put("angleX", NumberUtil.roundStr(angles.angleX(), 6));
-                    latestData.put("angleY", NumberUtil.roundStr(angles.angleY(), 6));
+                    latestData.put("angleX", NumberUtil.roundStr(angles.x(), 6));
+                    latestData.put("angleY", NumberUtil.roundStr(angles.y(), 6));
                     latestData.put("rawAngleX", record.getAngleX());
                     latestData.put("rawAngleY", record.getAngleY());
-                    latestData.put("baselineApplied", angles.baseline() != null);
-                    if (angles.baseline() != null) {
-                        latestData.put("baselineX", angles.baseline().angleX());
-                        latestData.put("baselineY", angles.baseline().angleY());
-                        latestData.put("baselineUpdatedAt", angles.baseline().updatedAt());
+                    latestData.put("baselineApplied", corrected.baseline() != null);
+                    if (corrected.baseline() != null) {
+                        latestData.put("baselineX", corrected.baseline().angleX());
+                        latestData.put("baselineY", corrected.baseline().angleY());
+                        latestData.put("baselineUpdatedAt", corrected.baseline().updatedAt());
                     }
                     latestData.put("temp", NumberUtil.roundStr(record.getTemp(), 3));
                     latestData.put("angleUnit", "deg");

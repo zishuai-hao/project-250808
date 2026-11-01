@@ -80,7 +80,7 @@ class DeviceScheduledReportTest {
         waterStore.initTable();
         reports = new DeviceScheduledReportService(config, inclineMapper, waterMapper, json, sender,
                 new HistoricalFluctuationSimulator(inclineMapper, json,
-                        new InclineFluctuationService(new InclineFluctuationConfig())));
+                        new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper())));
     }
 
     @Test
@@ -289,7 +289,7 @@ class DeviceScheduledReportTest {
         var mapper = (InclineForwardDataMapper) ReflectionTestUtils.getField(inclineStore, "mapper");
         var anchor = mapper.selectLatestForReport("2026-11-01 06:00:00", "2026-11-01 08:00:00").get(0);
         var learner = new HistoricalFluctuationSimulator(mapper, json,
-                    new InclineFluctuationService(new InclineFluctuationConfig()));
+                    new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
         var before = learner.simulate(anchor, T, config.getInclineVib().getSimulation()).orElseThrow();
         assertEquals(6, before.trainingCount()); // 同一时间重复入库不会变成额外样本
         sample("A", "INC", "2026-11-01 09:00:00", "999"); // 锚点之后不能用于学习

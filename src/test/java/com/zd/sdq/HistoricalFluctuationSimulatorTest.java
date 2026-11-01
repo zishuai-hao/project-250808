@@ -32,7 +32,7 @@ class HistoricalFluctuationSimulatorTest {
     private final InclineForwardDataMapper mapper = mock(InclineForwardDataMapper.class);
     private final DeviceReportConfig.Simulation config = new DeviceReportConfig.Simulation();
     private final HistoricalFluctuationSimulator simulator = new HistoricalFluctuationSimulator(mapper, json,
-                    new InclineFluctuationService(new InclineFluctuationConfig()));
+                    new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
     private List<InclineForwardData> rows;
 
     @BeforeEach
@@ -49,7 +49,7 @@ class HistoricalFluctuationSimulatorTest {
         for (int hour = 2; hour <= 4; hour++) {
             var result = simulator.simulate(sample, SOURCE.plusSeconds(hour * 3600L), config).orElseThrow();
             var restarted = new HistoricalFluctuationSimulator(mapper, json,
-                    new InclineFluctuationService(new InclineFluctuationConfig()))
+                    new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()))
                     .simulate(sample, SOURCE.plusSeconds(hour * 3600L), config).orElseThrow();
             assertEquals(result, restarted);
             assertEquals(8, result.trainingCount());
@@ -125,12 +125,8 @@ class HistoricalFluctuationSimulatorTest {
     void learnsAlreadyAmplifiedPayloadWithoutApplyingTheFactorAgainAndStopsAtOldUnscaledHistory() throws Exception {
         var amplification = new InclineFluctuationConfig();
         amplification.setEnabled(true);
-        var center = new InclineFluctuationConfig.Center();
-        center.setX(0.0);
-        center.setY(0.0);
-        amplification.getCenters().put("TEST", center);
         var learner = new HistoricalFluctuationSimulator(mapper, json,
-                new InclineFluctuationService(amplification));
+                new InclineFluctuationService(amplification, mapper, json));
         var sample = history(true, new double[]{0.01, 0.012, 0.011, 0.014, 0.013, 0.011, 0.015, 0.012});
         for (var row : rows) row.setDeviceCode("TEST");
         assertTrue(learner.simulate(sample, SOURCE.plusSeconds(7200), config).isEmpty(),
