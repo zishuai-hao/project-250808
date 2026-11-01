@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import io.vertx.core.Vertx;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -46,6 +47,7 @@ public class InclineDataHandler {
     private final InclineApiService inclineApiService;
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceLatestDataCache deviceLatestDataCache;
+    private final VibrationSpikeFilter vibrationSpikeFilter;
     private final InclineForwardDataService inclineForwardDataService;
     private final InclineBaselineService inclineBaselineService;
 
@@ -176,8 +178,11 @@ public class InclineDataHandler {
             // 构建查询请求
             InclineHistoryRequest request = new InclineHistoryRequest();
             request.setSn(remoteDeviceId);
-            request.setStartTm(DateUtil.formatDateTime(lastTime));
-            request.setEndTm(DateUtil.formatDateTime(new Date()));
+            request.setStartTm(startTime);
+            request.setEndTm(endTime);
+            // 从最早未处理记录开始，积压数据下次接续，避免倒序分页跳过中间记录。
+            request.setSortMode("asc");
+            request.setPagesize(100);
             response = inclineApiService.getHistoryData(request);
         } catch (IOException e) {
             log.error("查询设备[{}]数据失败: {}", remoteDeviceId, e.getMessage(), e);
@@ -221,7 +226,10 @@ public class InclineDataHandler {
             return;
         }
 
-        for (InclineHistoryResponse.InclineRecord record : records) {
+        // 窗口依赖相邻采集顺序，同时兼容接口返回倒序记录的情况。
+        List<InclineHistoryResponse.InclineRecord> orderedRecords = new ArrayList<>(records);
+        orderedRecords.sort(Comparator.comparing(InclineHistoryResponse.InclineRecord::getTm));
+        for (InclineHistoryResponse.InclineRecord record : orderedRecords) {
             log.debug("远程设备[{}]数据: {}", remoteDeviceId, record.getTm());
             // 解析记录时间
             Date recordTime = DateUtil.parse(record.getTm());
@@ -232,7 +240,6 @@ public class InclineDataHandler {
                         remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
                 continue;
             }
-            
 //            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
             // 使用当前时间作为标准
             ZonedDateTime zonedDateTime = ZonedDateTime.now(zoneId);
@@ -241,22 +248,7 @@ public class InclineDataHandler {
             for (DeviceInfoExt device : devices) {
                 // 如果是 VIB 设备，则发送加速度最大值数据
                 if (device.getDeviceType().equals(DeviceType.VIB)) {
-                    MqttDataBuilder builder = new MqttDataBuilder(DeviceType.VIB);
-                    builder.currentTime();
-                    builder.monitoringCode(device.getDeviceCode());
-                    // 单位转换 mG -> m/ss
-                    builder.addData(zonedDateTime, NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
-                    MqttData mqttData = builder.build();
-
-                    inclineForwardDataService.saveBeforeForward(device, remoteDeviceId, record, mqttData);
-                    // 保存成功后再发送数据到缓冲转发适配器
-                    bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
-                    Map<String, Object> latestData = new LinkedHashMap<>();
-                    latestData.put("accMaxZ", NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
-                    latestData.put("unit", "m/s2");
-                    latestData.put("alarmStatus", record.getAlarmStatus());
-                    latestData.put("runStatus", record.getRunStatus());
-                    deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
+                    vibrationSpikeFilter.process(device, record, this::forwardVibration);
                 }
                 // 如果是 INC 设备，则发送角度数据和温度数据
                 else if (device.getDeviceType().equals(DeviceType.INC)) {
@@ -300,6 +292,34 @@ public class InclineDataHandler {
             remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
             log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
         }
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void flushPendingVibrationData() {
+        vibrationSpikeFilter.flushExpired(this::forwardVibration);
+    }
+
+    private void forwardVibration(VibrationSpikeFilter.Sample sample) {
+        DeviceInfoExt device = sample.device();
+        InclineHistoryResponse.InclineRecord record = sample.record();
+        String accelerationValue = NumberUtil.roundStr(record.getAccMaxZ() * VibrationSpikeFilter.MG_TO_M_S2, 4);
+        // 待确认点延后转发时仍使用原始采集时间，避免与后续点挤到同一个时间戳。
+        ZonedDateTime sampleTime = LocalDateTime.parse(record.getTm(),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
+        MqttDataBuilder builder = new MqttDataBuilder(DeviceType.VIB);
+        builder.currentTime();
+        builder.monitoringCode(device.getDeviceCode());
+        builder.addData(sampleTime, accelerationValue);
+        MqttData mqttData = builder.build();
+        inclineForwardDataService.saveBeforeForward(device, device.getRemoteDeviceId(), record, mqttData);
+        bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
+
+        Map<String, Object> latestData = new LinkedHashMap<>();
+        latestData.put("accMaxZ", accelerationValue);
+        latestData.put("unit", "m/s2");
+        latestData.put("alarmStatus", record.getAlarmStatus());
+        latestData.put("runStatus", record.getRunStatus());
+        deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
     }
 
     /**

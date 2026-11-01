@@ -57,6 +57,17 @@ incline:
     write-timeout: 30
     token-refresh-interval: 80  # Token刷新间隔（分钟），默认2小时
 
+# 振动孤立尖峰过滤：疑似尖峰暂存，下一条恢复到前一条附近才丢弃中间点。
+# 连续高值、报警/故障/状态未知、缺少前后邻点时保留；过滤原值写入告警日志。
+vibration:
+  filter:
+    enabled: true
+    spike-min-delta: 2.0  # 中间点绝对幅值比前后两点分别至少增大多少，单位 m/s²
+    return-tolerance: 0.5  # 前后两点允许的加速度差，单位 m/s²
+    max-gap-seconds: 5400  # 90分钟，适配当前约每小时一条记录；超时不能确认则保留
+    device-codes:
+      - ZYXH-VIB-P01-002-02
+
 server:
   port: 42009
 

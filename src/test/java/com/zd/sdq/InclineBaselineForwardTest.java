@@ -5,6 +5,8 @@ import com.company.cbf.starter.data.entity.MqttData;
 import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
+import com.zd.sdq.config.VibrationFilterConfig;
+import com.zd.sdq.service.incline.VibrationSpikeFilter;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
 import com.zd.sdq.service.DeviceLatestDataCache;
 import com.zd.sdq.service.incline.InclineBaselineService;
@@ -35,7 +37,8 @@ class InclineBaselineForwardTest {
         DeviceLatestDataCache cache = new DeviceLatestDataCache();
         BufferForwardMqttClientAdapter mqtt = mock(BufferForwardMqttClientAdapter.class);
         InclineForwardDataService snapshots = mock(InclineForwardDataService.class);
-        InclineDataHandler handler = new InclineDataHandler(null, null, null, mqtt, cache, snapshots, baselines);
+        InclineDataHandler handler = new InclineDataHandler(null, null, null, mqtt, cache,
+                new VibrationSpikeFilter(new VibrationFilterConfig()), snapshots, baselines);
         Map<String, Date> cursor = (Map<String, Date>) ReflectionTestUtils.getField(handler,
                 "remoteDeviceIdLastDataTimeMap");
         DeviceInfoExt incline = device("TEST-INC", DeviceType.INC);
@@ -53,6 +56,7 @@ class InclineBaselineForwardTest {
 
         // 同一路真实处理函数依次验证未设置、已设置、清除后的转发内容。
         for (int pass = 0; pass < 3; pass++) {
+            record.setTm(String.format("2026-11-01 %02d:00:00", pass + 1));
             if (pass == 1) baselines.save("TEST-INC", 1.0, -2.0);
             if (pass == 2) baselines.remove("TEST-INC");
             cursor.put("SN", DateUtil.parse("2026-11-01 00:00:00"));
@@ -84,6 +88,7 @@ class InclineBaselineForwardTest {
         DeviceInfoExt device = new DeviceInfoExt();
         device.setDeviceCode(code);
         device.setDeviceType(type);
+        device.setRemoteDeviceId("SN");
         device.setEnable(true);
         return device;
     }
