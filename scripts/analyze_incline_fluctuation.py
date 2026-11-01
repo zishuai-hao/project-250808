@@ -116,7 +116,7 @@ def analyze(archive, output, config, factor):
              '相同采集时间重试，原始差为0，不会重复放大已有结果。', '',
              '现有angleX/Y和payload保存处理值；raw_data及rawAngleX/Y保留原始角度。温度、振动、水位和设备原始报警状态不参与放大。',
              '定时上报直接读取payload，不再次放大；历史模拟使用k*raw-payload的相邻变化检查段边界，不重放累加。',
-             '配置文件incline-fluctuation.yml只含enabled和factor，可用incline.fluctuation.enabled=false关闭，修改需重启。', '',
+             '统一倍率配置在主配置文件application.yml的incline.fluctuation下，只含enabled和factor，可用incline.fluctuation.enabled=false关闭，修改需重启。', '',
              '以下离线统计只比较统一倍率对波动的影响，meanShift按窗口首条原始值直接入库、零点为0且不变计算；不模拟线上自动设零。线上起点取实际初始化记录或数据库前值。',
              '表中的窗口首值仅供复算，不能生成或作为固定中心配置。统一倍率保持标准差/值域比例，不能恢复分辨率或证明设备有效。', '',
              '## 统一倍率对照', '',
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('archive', type=Path)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--config', type=Path, help='可选：生成统一增量倍率配置（不含固定中心）')
+    parser.add_argument('--config', type=Path, help='可选：生成供合并到主配置的统一增量倍率片段，不要指向现有application.yml')
     parser.add_argument('--factor', type=float, default=2.0)
     args = parser.parse_args()
     analyze(args.archive, args.output, args.config, args.factor)

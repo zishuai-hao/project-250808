@@ -1,6 +1,0 @@
-# 按前后两条原始角度的增量统一放大，只在入库前处理一次；零点按保持不变处理。
-# 上次原始值取raw_data，上次入库值取payload；重启从数据库续算，无固定中心。
-incline:
-  fluctuation:
-    enabled: true
-    factor: 2

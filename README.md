@@ -100,9 +100,9 @@ LIMIT 100;
 - 按零点保持不变处理，不检测零点变更。已有零点但没有有效历史或换SN时，第一条扣零起算；不更改设备更新时间或快照入库时间。
 - 每次从数据库读取前值，不维护额外内存状态；入库失败时保留原有采集重试机制。相同采集时间重试时，数据库中的原始值与当前值相同，增量为0，不会重复放大。历史不回写、不重算。
 - 结果仍写入原有 `payload` 的X/Y位置及状态缓存 `angleX/Y`，角度最终保留6位小数；`raw_data`、`rawAngleX/Y` 保留原始值。温度、振动、水位和设备原始报警状态保持原有处理。定时上报直接使用入库值，不再次放大。
-- `application.yml` 默认导入 `incline-fluctuation.yml`，其中只有 `incline.fluctuation.enabled=true`、`factor=2`，不再配置各设备固定中心。所有INC设备使用同一倍率，包括新增设备。关闭放大或设为1时直接扣零入库，配置修改需重启。
+- 统一倍率直接配置在主配置文件 `application.yml` 的 `incline.fluctuation` 下，默认 `enabled=true`、`factor=2`，不再配置各设备固定中心。所有INC设备使用同一倍率，包括新增设备。关闭放大或设为1时直接扣零入库，配置修改需重启。
 - 历史模拟继续学习已处理的 `payload`，用 `factor * raw - payload` 的相邻差异识别累加起点切换（允许6位小数舍入误差），输出不再放大。模拟与实测均使用原MQTT字段，不附加模拟标记。
-- 统一增量放大会同时放大真实变化与噪声，不能作为灵敏度标定或设备健康证明。原数据统计和按窗口首条起算的离线算例见 [评估报告](document/incline-fluctuation-assessment/assessment.md)。复算命令：`python3 scripts/analyze_incline_fluctuation.py <ZIP路径> --output <报告目录> --config <配置YAML路径>`；生成配置只包含开关和统一倍率。
+- 统一增量放大会同时放大真实变化与噪声，不能作为灵敏度标定或设备健康证明。原数据统计和按窗口首条起算的离线算例见 [评估报告](document/incline-fluctuation-assessment/assessment.md)。复算命令：`python3 scripts/analyze_incline_fluctuation.py <ZIP路径> --output <报告目录> --config <配置片段输出路径>`；生成配置片段只包含开关和统一倍率，按需合并到主配置，不要用片段覆盖整个 `application.yml`。
 
 振动孤立尖峰过滤：
 

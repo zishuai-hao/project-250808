@@ -24,7 +24,7 @@ ZIP SHA-256：`1b2d4680fb33c38fe79e74ec0284e054e0676773dde3c0f0ded9cf64ecc4931c`
 
 现有angleX/Y和payload保存处理值；raw_data及rawAngleX/Y保留原始角度。温度、振动、水位和设备原始报警状态不参与放大。
 定时上报直接读取payload，不再次放大；历史模拟使用k*raw-payload的相邻变化检查段边界，不重放累加。
-配置文件incline-fluctuation.yml只含enabled和factor，可用incline.fluctuation.enabled=false关闭，修改需重启。
+统一倍率配置在主配置文件application.yml的incline.fluctuation下，只含enabled和factor，可用incline.fluctuation.enabled=false关闭，修改需重启。
 
 以下离线统计只比较统一倍率对波动的影响，meanShift按窗口首条原始值直接入库、零点为0且不变计算；不模拟线上自动设零。线上起点取实际初始化记录或数据库前值。
 表中的窗口首值仅供复算，不能生成或作为固定中心配置。统一倍率保持标准差/值域比例，不能恢复分辨率或证明设备有效。
