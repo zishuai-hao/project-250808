@@ -2,6 +2,8 @@
 <configuration>
     <!-- 日志存放路径 -->
 	<property name="log.path" value="${user.dir}/log" />
+    <!-- 每个 appender 的归档日志容量上限，超限时优先删除最旧的归档 -->
+    <property name="log.totalSizeCap" value="1GB" />
     <!-- 日志输出格式 -->
 	<property name="log.pattern" value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{20} - [%method,%line] - %msg%n" />
 
@@ -21,6 +23,10 @@
 			<fileNamePattern>${log.path}/sys-info.%d{yyyy-MM-dd}.log</fileNamePattern>
 			<!-- 日志最大的历史 60天 -->
 			<maxHistory>60</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>${log.totalSizeCap}</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
 		</rollingPolicy>
 		<encoder>
 			<pattern>${log.pattern}</pattern>
@@ -43,6 +49,10 @@
             <fileNamePattern>${log.path}/sys-error.%d{yyyy-MM-dd}.log</fileNamePattern>
 			<!-- 日志最大的历史 60天 -->
 			<maxHistory>60</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>${log.totalSizeCap}</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <encoder>
             <pattern>${log.pattern}</pattern>
@@ -66,6 +76,10 @@
             <fileNamePattern>${log.path}/sys-warn.%d{yyyy-MM-dd}.log</fileNamePattern>
 			<!-- 日志最大的历史 60天 -->
 			<maxHistory>60</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>${log.totalSizeCap}</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <encoder>
             <pattern>${log.pattern}</pattern>
@@ -89,6 +103,10 @@
             <fileNamePattern>${log.path}/sys-debug.%d{yyyy-MM-dd}.log</fileNamePattern>
 			<!-- 日志最大的历史 30天 -->
 			<maxHistory>30</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>${log.totalSizeCap}</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <encoder>
             <pattern>${log.pattern}</pattern>
@@ -111,6 +129,10 @@
             <fileNamePattern>${log.path}/sys-user.%d{yyyy-MM-dd}.log</fileNamePattern>
             <!-- 日志最大的历史 60天 -->
             <maxHistory>60</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>${log.totalSizeCap}</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <encoder>
             <pattern>${log.pattern}</pattern>
@@ -128,8 +150,12 @@
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- 按天回滚 daily 当日期发生变化时，将日志输出到新文件中 -->
             <fileNamePattern>${log.path}/http-data.%d{yyyy-MM-dd}.log</fileNamePattern>
-            <!-- 日志最大的历史 120天 -->
-            <maxHistory>120</maxHistory>
+            <!-- HTTP 日志归档最多保留 30 天 -->
+            <maxHistory>30</maxHistory>
+            <!-- 归档总大小超过上限时，自动删除最旧的日志（不包含当前活动文件） -->
+            <totalSizeCap>200MB</totalSizeCap>
+            <!-- 应用启动时也清理历史归档，避免低流量服务长期不触发清理 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <!--日志输出的文件的格式 -->
         <encoder>

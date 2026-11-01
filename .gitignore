@@ -8,3 +8,4 @@ target
 /output_by_device/**
 /waterleveldata/**
 /water_level_data_all.csv
+/.idea/
