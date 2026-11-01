@@ -46,6 +46,7 @@ public class InclineDataHandler {
     private final InclineApiService inclineApiService;
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceLatestDataCache deviceLatestDataCache;
+    private final InclineForwardDataService inclineForwardDataService;
 
     /**
      * HTTP-Client 网关类型标识
@@ -118,7 +119,11 @@ public class InclineDataHandler {
                         // 在 Event Loop 线程中处理响应结果
                         if (res.succeeded()) {
                             InclineHistoryResponse response = (InclineHistoryResponse) res.result();
-                            processResponse(devices, response, remoteDeviceId);
+                            try {
+                                processResponse(devices, response, remoteDeviceId);
+                            } catch (Exception e) {
+                                log.error("远程设备[{}]数据保存或转发失败，下轮从上次完成的位置重试", remoteDeviceId, e);
+                            }
                         } else {
                             log.error("远程设备[{}]数据查询失败", remoteDeviceId, res.cause());
                         }
@@ -226,8 +231,6 @@ public class InclineDataHandler {
                         remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
                 continue;
             }
-            remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
-            log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
             
 //            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
             // 使用当前时间作为标准
@@ -244,7 +247,8 @@ public class InclineDataHandler {
                     builder.addData(zonedDateTime, NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
                     MqttData mqttData = builder.build();
 
-                    // 发送数据到缓冲转发适配器
+                    inclineForwardDataService.saveBeforeForward(device, remoteDeviceId, record, mqttData);
+                    // 保存成功后再发送数据到缓冲转发适配器
                     bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
                     Map<String, Object> latestData = new LinkedHashMap<>();
                     latestData.put("accMaxZ", NumberUtil.roundStr(record.getAccMaxZ() * 0.00980665, 4));
@@ -265,7 +269,8 @@ public class InclineDataHandler {
                             NumberUtil.roundStr(record.getTemp(), 3));
                     MqttData mqttData = builder.build();
 
-                    // 发送数据到缓冲转发适配器
+                    inclineForwardDataService.saveBeforeForward(device, remoteDeviceId, record, mqttData);
+                    // 保存成功后再发送数据到缓冲转发适配器
                     bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
                     Map<String, Object> latestData = new LinkedHashMap<>();
                     latestData.put("angleX", NumberUtil.roundStr(record.getAngleX(), 6));
@@ -280,6 +285,9 @@ public class InclineDataHandler {
                     log.warn("设备[{}]类型[{}]不支持", device.getDeviceCode(), device.getDeviceType());
                 }
             }
+            // 同一采集记录的全部通道处理完成后再推进，保存失败时保留重试机会。
+            remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
+            log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
         }
     }
 
