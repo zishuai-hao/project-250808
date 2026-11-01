@@ -68,43 +68,64 @@ public class VibrationSpikeFilter {
         if (!valid(acceleration)) {
             // 无效记录打断相邻关系，不能跨过它确认前一个点是孤立尖峰。
             releasePending(window, ready);
-            window.previous = null;
+            resetContext(window, null);
             logInvalid(sample);
             return ready;
         }
         Point current = new Point(sample, acceleration, time);
-        if (!enabled || (window.pending == null && window.previous != null
+        if (!enabled || window.previous == null || (window.pending == null
                 && time - window.previous.time() > maxGapMillis())
                 || (window.pending != null && (time - window.pending.time() > maxGapMillis()
                 || clock.millis() - window.pendingSince >= maxGapMillis()))) {
             releasePending(window, ready);
-            window.previous = current;
+            resetContext(window, current);
+            ready.add(sample);
+            return ready;
+        }
+
+        if (!normal(current) || !normal(window.previous)) {
+            releasePending(window, ready);
+            resetContext(window, current);
             ready.add(sample);
             return ready;
         }
 
         if (window.pending != null) {
             Point pending = window.pending;
-            if (normal(current) && largerThan(pending, current)
-                    && Math.abs(window.previous.acceleration() - acceleration) <= config.getReturnTolerance()) {
-                log.warn("过滤孤立振动尖峰：测点[{}]，SN[{}]，采集时间[{}]，accMaxZ原值[{}]mG，前/中/后[{} / {} / {}]m/s²，accMaxX[{}]mG，accMaxY[{}]mG，runStatus[{}]，alarmStatus[{}]",
+            boolean recovered = recovered(window, current);
+            if (recovered && largerThan(pending, current, window.excursionBaseline)) {
+                log.warn("过滤孤立振动尖峰：测点[{}]，SN[{}]，采集时间[{}]，accMaxZ原值[{}]mG，前/中/后[{} / {} / {}]m/s²，历史幅值中位数[{}]m/s²，accMaxX[{}]mG，accMaxY[{}]mG，runStatus[{}]，alarmStatus[{}]",
                         device.getDeviceCode(), device.getRemoteDeviceId(), pending.sample().record().getTm(),
                         pending.sample().record().getAccMaxZ(), window.previous.acceleration(), pending.acceleration(),
-                        acceleration, pending.sample().record().getAccMaxX(), pending.sample().record().getAccMaxY(),
+                        acceleration, window.excursionBaseline, pending.sample().record().getAccMaxX(), pending.sample().record().getAccMaxY(),
                         pending.sample().record().getRunStatus(), pending.sample().record().getAlarmStatus());
                 window.pending = null;
             } else {
-                // 未恢复、连续高值或状态异常，两个点都保留，不继续把当前点判作孤立尖峰。
+                // 第二条仍偏高时立即放行两条，并持续放行本轮高值，直到恢复基准。
                 releasePending(window, ready);
+            }
+            if (recovered) {
+                window.excursionAnchor = null;
+                remember(window, current);
             }
             window.previous = current;
             ready.add(sample);
-        } else if (window.previous != null && normal(window.previous) && normal(current)
-                && largerThan(current, window.previous)) {
+        } else if (window.excursionAnchor != null) {
+            // 已确认连续高值，本轮后续即使继续升高也不再暂存或丢弃。
+            if (recovered(window, current)) {
+                window.excursionAnchor = null;
+                remember(window, current);
+            }
+            window.previous = current;
+            ready.add(sample);
+        } else if (largerThan(current, window.previous, baseline(window))) {
             window.pending = current;
             window.pendingSince = clock.millis();
+            window.excursionAnchor = window.previous;
+            window.excursionBaseline = baseline(window);
         } else {
             window.previous = current;
+            remember(window, current);
             ready.add(sample);
         }
         return ready;
@@ -120,15 +141,51 @@ public class VibrationSpikeFilter {
                             window.pending.sample().record().getAccMaxZ());
                     // 先成功入库/转发，再清除待确认点；失败时保留以便下次重试。
                     forward.accept(window.pending.sample());
-                    window.pending = null;
-                    window.previous = null;
+                    resetContext(window, null);
                 }
             }
         }
     }
 
-    private boolean largerThan(Point peak, Point neighbor) {
-        return Math.abs(peak.acceleration()) - Math.abs(neighbor.acceleration()) >= config.getSpikeMinDelta();
+    private boolean largerThan(Point peak, Point neighbor, double baseline) {
+        double magnitude = Math.abs(peak.acceleration());
+        double delta = magnitude - Math.abs(neighbor.acceleration());
+        return delta >= config.getSpikeMinDelta()
+                || (delta >= config.getRelativeMinDelta()
+                && magnitude / Math.max(baseline, config.getNoiseFloor()) >= config.getSpikeRatio());
+    }
+
+    private boolean recovered(Window window, Point current) {
+        return !largerThan(current, window.excursionAnchor, window.excursionBaseline)
+                && Math.abs(window.excursionAnchor.acceleration() - current.acceleration()) <= config.getReturnTolerance();
+    }
+
+    private double baseline(Window window) {
+        List<Double> magnitudes = new ArrayList<>(window.history);
+        magnitudes.sort(Double::compareTo);
+        int middle = magnitudes.size() / 2;
+        return magnitudes.size() % 2 == 0
+                ? magnitudes.get(middle - 1) / 2 + magnitudes.get(middle) / 2
+                : magnitudes.get(middle);
+    }
+
+    private void remember(Window window, Point point) {
+        if (normal(point)) {
+            window.history.add(Math.abs(point.acceleration()));
+            while (window.history.size() > config.getBaselineWindowSize()) {
+                window.history.remove(0);
+            }
+        }
+    }
+
+    private void resetContext(Window window, Point current) {
+        window.previous = current;
+        window.pending = null;
+        window.excursionAnchor = null;
+        window.history.clear();
+        if (current != null) {
+            remember(window, current);
+        }
     }
 
     private boolean normal(Point point) {
@@ -163,6 +220,9 @@ public class VibrationSpikeFilter {
     private static class Window {
         private Point previous;
         private Point pending;
+        private Point excursionAnchor;
+        private double excursionBaseline;
+        private final List<Double> history = new ArrayList<>();
         private long pendingSince;
         private long lastSeenTime = Long.MIN_VALUE;
 
@@ -175,6 +235,10 @@ public class VibrationSpikeFilter {
         private void restore(Window source) {
             previous = source.previous;
             pending = source.pending;
+            excursionAnchor = source.excursionAnchor;
+            excursionBaseline = source.excursionBaseline;
+            history.clear();
+            history.addAll(source.history);
             pendingSince = source.pendingSince;
             lastSeenTime = source.lastSeenTime;
         }

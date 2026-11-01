@@ -169,7 +169,7 @@ class InclineVibrationFilterTest {
     void preservesStepChangesAndSmallFluctuations() {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"),
                 record(1.0, "2026-11-01 03:00:00"), record(0.1, "2026-11-01 04:00:00"),
-                record(1.5, "2026-11-01 05:00:00"), record(0.1, "2026-11-01 06:00:00"));
+                record(0.15, "2026-11-01 05:00:00"), record(0.1, "2026-11-01 06:00:00"));
         verify(forward, times(6)).push(eq(CODE), any());
     }
 
@@ -298,6 +298,7 @@ class InclineVibrationFilterTest {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"));
         config.setEnabled(true);
         config.setSpikeMinDelta(7);
+        config.setSpikeRatio(100);
         process(List.of(vibration), record(0.1, "2026-11-01 03:00:00"), record(6, "2026-11-01 04:00:00"));
         verify(forward, times(4)).push(eq(CODE), any());
     }
@@ -320,6 +321,151 @@ class InclineVibrationFilterTest {
     void rejectsInvalidGapAndAcceptsValidDefaults() {
         assertDoesNotThrow(config::validate);
         config.setMaxGapSeconds(0);
+        assertThrows(IllegalArgumentException.class, config::validate);
+    }
+
+    @Test
+    void includesTheInvestigatedCbxhPointByDefault() {
+        assertTrue(config.getDeviceCodes().contains("CBXH-VIB-P01-001-03"));
+    }
+
+    @Test
+    void rejectsTheCbxhSizedSpikeOnlyAfterARecoverySample() {
+        var peak = record(-13.95 * VibrationSpikeFilter.MG_TO_M_S2, "2026-11-01 02:00:00");
+        process(List.of(vibration), record(-0.66 * VibrationSpikeFilter.MG_TO_M_S2, TIME), peak);
+
+        verify(forward).push(eq(CODE), any());
+        verify(archive, never()).saveBeforeForward(any(), anyString(), same(peak), any());
+        process(List.of(vibration), record(-0.5 * VibrationSpikeFilter.MG_TO_M_S2, "2026-11-01 03:00:00"));
+
+        verify(forward, times(2)).push(eq(CODE), any());
+        verify(archive, never()).saveBeforeForward(any(), anyString(), same(peak), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {2, 3, 4})
+    void immediatelyReleasesTwoOrMoreElevatedSamplesAndKeepsTheWholeRun(int count) {
+        process(List.of(vibration), record(0.006, TIME));
+        double[] amplitudes = {0.137, 0.09, 1.5, 6.0};
+        for (int i = 0; i < count; i++) {
+            process(List.of(vibration), record(amplitudes[i], String.format("2026-11-01 %02d:00:00", i + 2)));
+            verify(forward, times(i == 0 ? 1 : i + 2)).push(eq(CODE), any());
+        }
+        process(List.of(vibration), record(0.006, String.format("2026-11-01 %02d:00:00", count + 2)));
+        verify(forward, times(count + 2)).push(eq(CODE), any());
+    }
+
+    @Test
+    void keepsTwoElevatedSamplesEvenWhenTheFirstIsMuchLarger() {
+        process(List.of(vibration), record(0.006, TIME), record(6, "2026-11-01 02:00:00"),
+                record(0.137, "2026-11-01 03:00:00"), record(0.006, "2026-11-01 04:00:00"));
+        verify(forward, times(4)).push(eq(CODE), any());
+    }
+
+    @Test
+    void doesNotStageTinyValuesJustBecauseTheirRatioIsLarge() {
+        process(List.of(vibration), record(0, TIME), record(0.0001, "2026-11-01 02:00:00"));
+        verify(forward, times(2)).push(eq(CODE), any());
+    }
+
+    @Test
+    void usesHistoricalMedianInsteadOfAnUnusuallySmallPreviousValue() {
+        process(List.of(vibration), record(0.01, TIME), record(0.01, "2026-11-01 02:00:00"),
+                record(0.01, "2026-11-01 03:00:00"), record(0.0001, "2026-11-01 04:00:00"),
+                record(0.06, "2026-11-01 05:00:00"));
+        verify(forward, times(5)).push(eq(CODE), any());
+    }
+
+    @Test
+    void honorsTheConfiguredRatioMinimumIncrementAndNoiseFloor() {
+        config.setSpikeRatio(20);
+        process(List.of(vibration), record(0.006, TIME), record(0.1, "2026-11-01 02:00:00"));
+        verify(forward, times(2)).push(eq(CODE), any());
+
+        config.setSpikeRatio(10);
+        config.setRelativeMinDelta(0.2);
+        process(List.of(vibration), record(0.006, "2026-11-01 03:00:00"), record(0.137, "2026-11-01 04:00:00"));
+        verify(forward, times(4)).push(eq(CODE), any());
+
+        config.setRelativeMinDelta(0.05);
+        config.setNoiseFloor(0.02);
+        process(List.of(vibration), record(0, "2026-11-01 05:00:00"), record(0.137, "2026-11-01 06:00:00"));
+        verify(forward, times(6)).push(eq(CODE), any());
+    }
+
+    @Test
+    void rollsTheHistoricalWindowForward() {
+        config.setBaselineWindowSize(3);
+        process(List.of(vibration), record(0.1, TIME), record(0.1, "2026-11-01 02:00:00"),
+                record(0.1, "2026-11-01 03:00:00"), record(0.01, "2026-11-01 04:00:00"),
+                record(0.01, "2026-11-01 05:00:00"), record(0.01, "2026-11-01 06:00:00"),
+                record(0.12, "2026-11-01 07:00:00"));
+        verify(forward, times(6)).push(eq(CODE), any());
+        process(List.of(vibration), record(0.01, "2026-11-01 08:00:00"));
+        verify(forward, times(7)).push(eq(CODE), any());
+    }
+
+    @Test
+    void keepsExcursionsOutOfTheBaselineAndStartsFilteringAgainAfterRecovery() {
+        process(List.of(vibration), record(0.006, TIME), record(0.137, "2026-11-01 02:00:00"),
+                record(0.09, "2026-11-01 03:00:00"), record(1.5, "2026-11-01 04:00:00"),
+                record(0.006, "2026-11-01 05:00:00"));
+        var isolated = record(0.137, "2026-11-01 06:00:00");
+        process(List.of(vibration), isolated, record(0.006, "2026-11-01 07:00:00"));
+        verify(forward, times(6)).push(eq(CODE), any());
+        verify(archive, never()).saveBeforeForward(any(), anyString(), same(isolated), any());
+    }
+
+    @Test
+    void filteredRelativePeaksDoNotPolluteTheHistoricalMedian() {
+        config.setBaselineWindowSize(3);
+        var first = record(0.137, "2026-11-01 02:00:00");
+        var second = record(0.137, "2026-11-01 04:00:00");
+        process(List.of(vibration), record(0.006, TIME), first, record(0.006, "2026-11-01 03:00:00"),
+                second, record(0.006, "2026-11-01 05:00:00"));
+        verify(forward, times(3)).push(eq(CODE), any());
+        verify(archive, never()).saveBeforeForward(any(), anyString(), same(first), any());
+        verify(archive, never()).saveBeforeForward(any(), anyString(), same(second), any());
+    }
+
+    @Test
+    void restoresTheConsecutiveRunWhenReleasingTheSecondHighSampleFails() {
+        var first = record(0.137, "2026-11-01 02:00:00");
+        var second = record(0.09, "2026-11-01 03:00:00");
+        process(List.of(vibration), record(0.006, TIME), first);
+        doThrow(new IllegalStateException("database unavailable")).doNothing()
+                .when(archive).saveBeforeForward(eq(vibration), eq(SN), same(second), any());
+
+        assertThrows(IllegalStateException.class, () -> process(List.of(vibration), second));
+        assertEquals(DateUtil.parse(first.getTm()), lastTimes().get(SN));
+        process(List.of(vibration), second, record(1.5, "2026-11-01 04:00:00"),
+                record(0.006, "2026-11-01 05:00:00"));
+
+        verify(archive, times(2)).saveBeforeForward(eq(vibration), eq(SN), same(first), any());
+        verify(forward, times(6)).push(eq(CODE), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {0, 1, -1, Double.NaN, Double.POSITIVE_INFINITY})
+    void rejectsInvalidRatios(double ratio) {
+        config.setSpikeRatio(ratio);
+        assertThrows(IllegalArgumentException.class, config::validate);
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {0, -1, Double.NaN, Double.POSITIVE_INFINITY})
+    void rejectsInvalidRelativeMinimumsAndNoiseFloors(double value) {
+        config.setRelativeMinDelta(value);
+        assertThrows(IllegalArgumentException.class, config::validate);
+        config.setRelativeMinDelta(0.05);
+        config.setNoiseFloor(value);
+        assertThrows(IllegalArgumentException.class, config::validate);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void rejectsInvalidBaselineWindowSizes(int size) {
+        config.setBaselineWindowSize(size);
         assertThrows(IllegalArgumentException.class, config::validate);
     }
 
