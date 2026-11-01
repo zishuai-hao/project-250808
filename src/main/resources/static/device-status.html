@@ -399,7 +399,7 @@
     <form id="baseline-form">
         <h2 id="baseline-title">设置倾角基准</h2>
         <div id="baseline-device" class="device-code"></div>
-        <p class="muted">先将原始角度扣零，首条直接入库；后续把前后两条扣零原始值的变化乘倍率，累加到上次入库值。按零点保持不变处理，历史记录保持原值。</p>
+        <p class="muted">未设零点时，自动用本批最新有效新数据的原始X/Y设零，该条以0入库；后续把原始值前后变化乘倍率，累加到上次入库值。已有零点时按其保持不变处理。</p>
         <label>X 轴基准（°）<input id="baseline-x" type="number" step="any" required></label>
         <label>Y 轴基准（°）<input id="baseline-y" type="number" step="any" required></label>
         <button id="baseline-use-current" type="button" class="secondary">使用最新原始值</button>

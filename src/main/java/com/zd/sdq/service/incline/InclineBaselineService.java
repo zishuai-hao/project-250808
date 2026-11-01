@@ -11,6 +11,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -57,6 +58,14 @@ public class InclineBaselineService {
 
     public void remove(String deviceCode) {
         update(deviceCode, null);
+    }
+
+    /** 首次采集将原始值设为零点，与对应的0值快照一起提交；失败时一起回滚。 */
+    @Transactional
+    public CorrectedAngles initializeAndStoreZero(String deviceCode, double rawX, double rawY, Runnable storeZero) {
+        InclineBaseline baseline = save(deviceCode, rawX, rawY);
+        storeZero.run();
+        return new CorrectedAngles(0, 0, baseline);
     }
 
     private void update(String deviceCode, String json) {

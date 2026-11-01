@@ -33,7 +33,7 @@ class InclineBaselineForwardTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void storesRelativeAnglesButPreservesRawRecordTemperatureAndVibration() throws Exception {
+    void automaticallyInitializesMissingZeroAndPreservesRawRecordTemperatureAndVibration() throws Exception {
         InclineBaselineService baselines = InclineBaselineTest.database(directory.resolve("devices.db")).service();
         DeviceLatestDataCache cache = new DeviceLatestDataCache();
         InclineForwardDataService snapshots = mock(InclineForwardDataService.class);
@@ -55,7 +55,7 @@ class InclineBaselineForwardTest {
         InclineHistoryResponse response = new InclineHistoryResponse();
         response.setData(data);
 
-        // 同一路真实处理函数依次验证未设置、已设置、清除后的转发内容。
+        // 未设置时自动设零；已有基准时扣减；清除后下条有效数据重新自动设零。
         for (int pass = 0; pass < 3; pass++) {
             record.setTm(String.format("2026-11-01 %02d:00:00", pass + 1));
             if (pass == 1) baselines.save("TEST-INC", 1.0, -2.0);
@@ -68,8 +68,8 @@ class InclineBaselineForwardTest {
             verify(snapshots).saveCollectedData(eq(incline), eq("SN"), same(record), payload.capture());
             var values = payload.getValue().getValue();
             assertEquals(record.getTm() + ".000", values.get(0).get(0));
-            assertEquals(List.of(pass == 1 ? "0.234568" : "1.234568",
-                    pass == 1 ? "-0.987654" : "-2.987654", "20.123"), values.get(0).subList(1, 4));
+            assertEquals(List.of(pass == 1 ? "0.234568" : "0.000000",
+                    pass == 1 ? "-0.987654" : "0.000000", "20.123"), values.get(0).subList(1, 4));
 
             verify(snapshots).saveCollectedData(eq(vibration), eq("SN"), same(record), payload.capture());
             assertEquals("0.2157", payload.getValue().getValue().get(0).get(1));
@@ -77,8 +77,8 @@ class InclineBaselineForwardTest {
             var latest = cache.getLatestData("TEST-INC").getLatestData();
             assertEquals(1.23456789, latest.get("rawAngleX"));
             assertEquals(-2.98765432, latest.get("rawAngleY"));
-            assertEquals(pass == 1, latest.get("baselineApplied"));
-            assertEquals(pass == 1 ? "0.234568" : "1.234568", latest.get("angleX"));
+            assertEquals(true, latest.get("baselineApplied"));
+            assertEquals(pass == 1 ? "0.234568" : "0.000000", latest.get("angleX"));
             assertEquals(1.23456789, record.getAngleX());
             assertEquals(-2.98765432, record.getAngleY());
             assertEquals(20.123456, record.getTemp());

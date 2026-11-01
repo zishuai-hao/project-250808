@@ -40,13 +40,16 @@ class InclineVibrationFilterTest {
     private final DeviceLatestDataCache cache = new DeviceLatestDataCache();
     private final InclineForwardDataService archive = mock(InclineForwardDataService.class);
     private final Clock clock = mock(Clock.class);
+    private final DeviceInfoExtMapper baselineMapper = mock(DeviceInfoExtMapper.class);
     private final InclineBaselineService baselines = new InclineBaselineService(
-            mock(DeviceInfoExtMapper.class), new ObjectMapper(), null);
+            baselineMapper, new ObjectMapper(), null);
     private InclineDataHandler handler;
     private DeviceInfoExt vibration;
 
     @BeforeEach
     void setUp() {
+        when(baselineMapper.getInclineBaselineJson(anyString())).thenReturn(
+                "{\"angleX\":0,\"angleY\":0,\"updatedAt\":\"2026-11-01T00:00:00Z\"}");
         handler = new InclineDataHandler(null, null, null, cache,
                 new VibrationSpikeFilter(config, clock), archive, baselines,
                 new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));

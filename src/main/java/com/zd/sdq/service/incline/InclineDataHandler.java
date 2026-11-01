@@ -224,6 +224,11 @@ public class InclineDataHandler {
         // 窗口依赖相邻采集顺序，同时兼容接口返回倒序记录的情况。
         List<InclineHistoryResponse.InclineRecord> orderedRecords = new ArrayList<>(records);
         orderedRecords.sort(Comparator.comparing(InclineHistoryResponse.InclineRecord::getTm));
+        // 尚无零点的INC从本批最新有效新数据起算，不把此前积压值累加到新的0值上。
+        var latestNewIncline = orderedRecords.stream()
+                .filter(record -> DateUtil.parse(record.getTm()).after(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)))
+                .filter(record -> finite(record.getAngleX()) && finite(record.getAngleY()) && finite(record.getTemp()))
+                .max(Comparator.comparing(InclineHistoryResponse.InclineRecord::getTm)).orElse(null);
         for (InclineHistoryResponse.InclineRecord record : orderedRecords) {
             log.debug("远程设备[{}]数据: {}", remoteDeviceId, record.getTm());
             // 解析记录时间
@@ -252,7 +257,10 @@ public class InclineDataHandler {
                     }
                     var corrected = inclineBaselineService.apply(
                             device.getDeviceCode(), record.getAngleX(), record.getAngleY());
-                    var angles = inclineFluctuationService.apply(device, record, corrected);
+                    boolean initializeZero = corrected.baseline() == null;
+                    if (initializeZero && record != latestNewIncline) continue;
+                    var angles = initializeZero ? new InclineFluctuationService.Angles(0, 0)
+                            : inclineFluctuationService.apply(device, record, corrected);
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
                     builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
                     builder.monitoringCode(device.getDeviceCode());
@@ -263,7 +271,13 @@ public class InclineDataHandler {
                             NumberUtil.roundStr(record.getTemp(), 3));
                     MqttData mqttData = builder.build();
 
-                    inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
+                    if (initializeZero) {
+                        corrected = inclineBaselineService.initializeAndStoreZero(device.getDeviceCode(),
+                                record.getAngleX(), record.getAngleY(), () -> inclineForwardDataService
+                                        .saveCollectedData(device, remoteDeviceId, record, mqttData));
+                    } else {
+                        inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
+                    }
                     Map<String, Object> latestData = new LinkedHashMap<>();
                     latestData.put("angleX", NumberUtil.roundStr(angles.x(), 6));
                     latestData.put("angleY", NumberUtil.roundStr(angles.y(), 6));
