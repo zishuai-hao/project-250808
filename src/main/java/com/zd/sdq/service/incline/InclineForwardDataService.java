@@ -43,13 +43,13 @@ public class InclineForwardDataService {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         try {
             int deletedCount = mapper.deleteCreatedBefore(cutoffTime);
-            log.info("清理入库超过45天的倾角发送前数据完成，删除 {} 条，时间阈值: {}", deletedCount, cutoffTime);
+            log.info("清理入库超过45天的倾角采集数据完成，删除 {} 条，时间阈值: {}", deletedCount, cutoffTime);
         } catch (Exception e) {
-            log.error("清理倾角发送前历史数据失败，时间阈值: {}", cutoffTime, e);
+            log.error("清理倾角采集历史数据失败，时间阈值: {}", cutoffTime, e);
         }
     }
 
-    public void saveBeforeForward(DeviceInfoExt device, String remoteDeviceId,
+    public void saveCollectedData(DeviceInfoExt device, String remoteDeviceId,
                                   InclineHistoryResponse.InclineRecord record, MqttData mqttData) {
         InclineForwardData snapshot = new InclineForwardData();
         snapshot.setDeviceCode(device.getDeviceCode());
@@ -62,10 +62,10 @@ public class InclineForwardDataService {
             snapshot.setPayload(objectMapper.writeValueAsString(mqttData.getValue()));
             snapshot.setRawData(objectMapper.writeValueAsString(record));
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("序列化发送前数据失败，测点: " + device.getDeviceCode(), e);
+            throw new IllegalStateException("序列化采集数据失败，测点: " + device.getDeviceCode(), e);
         }
         if (mapper.insert(snapshot) != 1) {
-            throw new IllegalStateException("保存发送前数据失败，测点: " + device.getDeviceCode());
+            throw new IllegalStateException("保存采集数据失败，测点: " + device.getDeviceCode());
         }
     }
 }

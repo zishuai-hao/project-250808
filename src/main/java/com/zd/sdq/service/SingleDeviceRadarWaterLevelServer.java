@@ -1,18 +1,10 @@
 package com.zd.sdq.service;
 
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.io.unit.DataUnit;
 import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.NumberUtil;
-import com.company.cbf.starter.data.entity.MqttData;
-import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
-import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
-import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
-import com.zd.sdq.entity.WaterLevelData;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
-import com.zd.sdq.mapper.WaterLevelDataMapper;
-import com.zd.sdq.service.incline.InclineDataHandler;
 import com.zd.sdq.util.ModbusRtuUtil;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
@@ -21,9 +13,10 @@ import io.vertx.core.net.NetServerOptions;
 import io.vertx.core.net.NetSocket;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,13 +32,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class SingleDeviceRadarWaterLevelServer {
 
     private final DeviceInfoExt deviceInfo;
-    private final BufferForwardMqttClientAdapter mqttAdapter;
     private final Vertx vertx;
     private final int port;
     private final String deviceAddress;
     private final int sendIntervalMs;
     private final DeviceInfoExtMapper deviceMapper;
-    private final WaterLevelDataMapper waterLevelDataMapper;
+    private final WaterLevelDataService waterLevelDataService;
     private final DeviceLatestDataCache deviceLatestDataCache;
 
     private NetServer netServer;
@@ -59,22 +51,19 @@ public class SingleDeviceRadarWaterLevelServer {
     /**
      * 构造函数
      * @param deviceInfo 设备信息
-     * @param mqttAdapter MQTT适配器
      * @param vertx Vert.x实例
      */
     public SingleDeviceRadarWaterLevelServer(DeviceInfoExt deviceInfo,
-                                             BufferForwardMqttClientAdapter mqttAdapter,
                                              Vertx vertx,
                                              DeviceInfoExtMapper deviceMapper,
-                                             WaterLevelDataMapper waterLevelDataMapper,
+                                             WaterLevelDataService waterLevelDataService,
                                              DeviceLatestDataCache deviceLatestDataCache) {
         this.deviceInfo = deviceInfo;
-        this.mqttAdapter = mqttAdapter;
         this.vertx = vertx;
         this.port = Integer.parseInt(deviceInfo.getPort());
         this.deviceAddress = deviceInfo.getRemoteDeviceId();
         this.deviceMapper = deviceMapper;
-        this.waterLevelDataMapper = waterLevelDataMapper;
+        this.waterLevelDataService = waterLevelDataService;
         this.deviceLatestDataCache = deviceLatestDataCache;
         // frequency是秒,转换为毫秒
         int frequency = Integer.parseInt(deviceInfo.getFrequency());
@@ -254,8 +243,20 @@ public class SingleDeviceRadarWaterLevelServer {
                         deviceInfo.getDeviceCode(), clientAddress, waterLevelMeter);
                 lastDataTime.set(System.currentTimeMillis());
                 
-                // 转发数据到MQTT
-                forwardDataToMqtt(waterLevelMeter);
+                // 设备协议没有采集时间，在收到响应时固定时间；数据库操作放到Worker线程。
+                ZonedDateTime receivedAt = ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
+                vertx.executeBlocking(promise -> {
+                    try {
+                        saveWaterLevelData(waterLevelMeter, receivedAt);
+                        promise.complete();
+                    } catch (Exception e) {
+                        promise.fail(e);
+                    }
+                }, true, result -> {
+                    if (result.failed()) {
+                        log.error("设备[{}]水位入库失败", deviceInfo.getDeviceCode(), result.cause());
+                    }
+                });
             } else {
                 log.warn("设备[{}]无法从响应中解析水位", deviceInfo.getDeviceCode());
             }
@@ -325,43 +326,28 @@ public class SingleDeviceRadarWaterLevelServer {
     }
 
     /**
-     * 转发数据到MQTT
+     * 保存采集结果；MQTT由统一定时任务查询并发送。
      */
-    private void forwardDataToMqtt(Double waterLevel) {
-        try {
-            // 检查baseline是否为null(虽然在启动时已验证,但为了安全再次检查)
-            Double baseline = deviceInfo.getBaseline();
-            if (baseline == null) {
-                log.error("设备[{}]基线值为空,无法计算差值,跳过转发", deviceInfo.getDeviceCode());
-                return;
-            }
-            
-            double diff = baseline - waterLevel;
-            // 保存至数据库
-            waterLevelDataMapper.insert(new WaterLevelData(null, deviceInfo.getDeviceCode(), diff, DateUtil.now(), DateUtil.now()));
-
-            MqttData build = new MqttDataBuilder(DeviceType.WLV)
-                    .monitoringCode(deviceInfo.getDeviceCode())
-                    .currentTime()
-                    .addData(
-                            LocalDateTime.now().atZone(InclineDataHandler.zoneId),
-                            List.of(NumberUtil.roundStr(diff, 4), NumberUtil.roundStr(waterLevel, 4))
-                    )
-                    .build();
-            // 通过BufferForwardMqttClientAdapter转发数据
-            mqttAdapter.push(deviceInfo.getDeviceCode(), build.getValue());
-
-            Map<String, Object> latestData = new LinkedHashMap<>();
-            latestData.put("waterLevel", NumberUtil.roundStr(waterLevel, 4));
-            latestData.put("baseline", NumberUtil.roundStr(baseline, 4));
-            latestData.put("diff", NumberUtil.roundStr(diff, 4));
-            latestData.put("unit", "m");
-            deviceLatestDataCache.updateLatestData(deviceInfo, "RADAR_WATER_LEVEL_TCP", latestData, DateUtil.now());
-
-            log.debug("设备[{}]数据已转发到MQTT - 原始水位: {} m, 基线: {} m, 差值: {} m", 
-                    deviceInfo.getDeviceCode(), waterLevel, baseline, diff);
-        } catch (Exception e) {
-            log.error("设备[{}]转发数据到MQTT失败: {}", deviceInfo.getDeviceCode(), e.getMessage(), e);
+    private void saveWaterLevelData(Double waterLevel, ZonedDateTime receivedAt) {
+        // 检查baseline是否为null(虽然在启动时已验证,但为了安全再次检查)
+        Double baseline = deviceInfo.getBaseline();
+        if (baseline == null) {
+            log.error("设备[{}]基线值为空,无法计算差值,跳过入库", deviceInfo.getDeviceCode());
+            return;
         }
+
+        double diff = baseline - waterLevel;
+        waterLevelDataService.saveCollectedData(deviceInfo.getDeviceCode(), diff, waterLevel, receivedAt);
+
+        Map<String, Object> latestData = new LinkedHashMap<>();
+        latestData.put("waterLevel", NumberUtil.roundStr(waterLevel, 4));
+        latestData.put("baseline", NumberUtil.roundStr(baseline, 4));
+        latestData.put("diff", NumberUtil.roundStr(diff, 4));
+        latestData.put("unit", "m");
+        deviceLatestDataCache.updateLatestData(deviceInfo, "RADAR_WATER_LEVEL_TCP", latestData,
+                receivedAt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+
+        log.debug("设备[{}]采集数据已入库 - 原始水位: {} m, 基线: {} m, 差值: {} m",
+                deviceInfo.getDeviceCode(), waterLevel, baseline, diff);
     }
 }

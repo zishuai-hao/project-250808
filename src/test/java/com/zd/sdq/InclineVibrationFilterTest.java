@@ -1,7 +1,6 @@
 package com.zd.sdq;
 
 import cn.hutool.core.date.DateUtil;
-import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.config.VibrationFilterConfig;
 import com.zd.sdq.entity.DeviceInfoExt;
@@ -36,7 +35,6 @@ class InclineVibrationFilterTest {
     private static final String START = "2026-11-01 00:00:00";
     private static final String TIME = "2026-11-01 01:00:00";
     private final VibrationFilterConfig config = new VibrationFilterConfig();
-    private final BufferForwardMqttClientAdapter forward = mock(BufferForwardMqttClientAdapter.class);
     private final DeviceLatestDataCache cache = new DeviceLatestDataCache();
     private final InclineForwardDataService archive = mock(InclineForwardDataService.class);
     private final Clock clock = mock(Clock.class);
@@ -47,7 +45,7 @@ class InclineVibrationFilterTest {
 
     @BeforeEach
     void setUp() {
-        handler = new InclineDataHandler(null, null, null, forward, cache,
+        handler = new InclineDataHandler(null, null, null, cache,
                 new VibrationSpikeFilter(config, clock), archive, baselines);
         Map<String, Date> lastTimes = lastTimes();
         lastTimes.put(SN, DateUtil.parse(START));
@@ -62,16 +60,16 @@ class InclineVibrationFilterTest {
         InclineHistoryResponse.InclineRecord peak = record(acceleration, "2026-11-01 02:00:00");
         process(List.of(vibration, incline), peak);
 
-        verify(forward).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(eq(vibration), anyString(), same(peak), any());
-        verify(forward, times(2)).push(eq(incline.getDeviceCode()), any());
+        verifyStored(CODE, times(1));
+        verify(archive, never()).saveCollectedData(eq(vibration), anyString(), same(peak), any());
+        verifyStored(incline.getDeviceCode(), times(2));
         assertEquals(TIME, cache.getLatestData(CODE).getDataTime());
         assertNotNull(cache.getLatestData(incline.getDeviceCode()));
         assertEquals(DateUtil.parse(peak.getTm()), lastTimes().get(SN));
 
         process(List.of(vibration, incline), record(0.11, "2026-11-01 03:00:00"));
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(eq(vibration), anyString(), same(peak), any());
+        verifyStored(CODE, times(2));
+        verify(archive, never()).saveCollectedData(eq(vibration), anyString(), same(peak), any());
         assertEquals("2026-11-01 03:00:00", cache.getLatestData(CODE).getDataTime());
     }
 
@@ -80,7 +78,7 @@ class InclineVibrationFilterTest {
     void forwardsFirstRecordWithoutInventingAPreviousNeighbor(double acceleration) {
         process(List.of(vibration), record(acceleration, TIME));
 
-        verify(forward).push(eq(CODE), any());
+        verifyStored(CODE, times(1));
         assertEquals(acceleration,
                 Double.parseDouble(cache.getLatestData(CODE).getLatestData().get("accMaxZ").toString()), 0.00005);
     }
@@ -94,8 +92,8 @@ class InclineVibrationFilterTest {
         DeviceInfoExt incline = device("ZYXH-INC-P01-002-02", DeviceType.INC);
 
         assertDoesNotThrow(() -> process(List.of(vibration, incline), record));
-        verify(forward, never()).push(eq(CODE), any());
-        verify(forward).push(eq(incline.getDeviceCode()), any());
+        verifyStored(CODE, never());
+        verifyStored(incline.getDeviceCode(), times(1));
     }
 
     @Test
@@ -105,7 +103,7 @@ class InclineVibrationFilterTest {
         assertEquals(TIME, cache.getLatestData(CODE).getDataTime());
         process(List.of(vibration), record(-0.2, "2026-11-01 03:00:00"));
 
-        verify(forward, times(2)).push(eq(CODE), any());
+        verifyStored(CODE, times(2));
         assertEquals(-0.2, Double.parseDouble(cache.getLatestData(CODE).getLatestData().get("accMaxZ").toString()));
         assertEquals("2026-11-01 03:00:00", cache.getLatestData(CODE).getDataTime());
     }
@@ -114,43 +112,42 @@ class InclineVibrationFilterTest {
     void leavesOtherVibrationDevicesUnchanged() {
         DeviceInfoExt other = device("ZYXH-VIB-P01-002-03", DeviceType.VIB);
         process(List.of(other), record(0.1, TIME), record(6, "2026-11-01 02:00:00"), record(0.1, "2026-11-01 03:00:00"));
-        verify(forward, times(3)).push(eq(other.getDeviceCode()), any());
+        verifyStored(other.getDeviceCode(), times(3));
     }
 
     @Test
-    void savesExactPayloadBeforeForwardingBothChannelsAndSkipsDuplicates() {
+    void storesBothChannelsWithOriginalTimeAndSkipsDuplicates() {
         DeviceInfoExt incline = device("ZYXH-INC-P01-002-02", DeviceType.INC);
         InclineHistoryResponse.InclineRecord record = record(0.22451234, TIME);
         record.setAngleX(0.123456789);
         process(List.of(vibration, incline), record);
 
-        var order = inOrder(archive, forward);
+        var order = inOrder(archive);
         var vibrationData = org.mockito.ArgumentCaptor.forClass(com.company.cbf.starter.data.entity.MqttData.class);
         var inclineData = org.mockito.ArgumentCaptor.forClass(com.company.cbf.starter.data.entity.MqttData.class);
-        order.verify(archive).saveBeforeForward(eq(vibration), eq(SN), same(record), vibrationData.capture());
-        order.verify(forward).push(eq(CODE), eq(vibrationData.getValue().getValue()));
-        order.verify(archive).saveBeforeForward(eq(incline), eq(SN), same(record), inclineData.capture());
-        order.verify(forward).push(eq(incline.getDeviceCode()), eq(inclineData.getValue().getValue()));
+        order.verify(archive).saveCollectedData(eq(vibration), eq(SN), same(record), vibrationData.capture());
+
+        order.verify(archive).saveCollectedData(eq(incline), eq(SN), same(record), inclineData.capture());
+
         assertTrue(vibrationData.getValue().getValue().get(0).contains("0.2245"));
         assertTrue(inclineData.getValue().getValue().get(0).contains("0.123457"));
 
         process(List.of(vibration, incline), record);
-        verifyNoMoreInteractions(archive, forward);
+        verifyNoMoreInteractions(archive);
     }
 
     @Test
     void databaseFailurePreventsForwardAndKeepsProgressForRetry() {
         InclineHistoryResponse.InclineRecord record = record(0.1, TIME);
         doThrow(new IllegalStateException("database unavailable")).doNothing()
-                .when(archive).saveBeforeForward(eq(vibration), eq(SN), same(record), any());
+                .when(archive).saveCollectedData(eq(vibration), eq(SN), same(record), any());
 
         assertThrows(IllegalStateException.class, () -> process(List.of(vibration), record));
-        verifyNoInteractions(forward);
         assertNull(cache.getLatestData(CODE));
         assertEquals(DateUtil.parse(START), lastTimes().get(SN));
 
         process(List.of(vibration), record);
-        verify(forward).push(eq(CODE), any());
+        verifyStored(CODE, times(2));
         assertEquals(DateUtil.parse(TIME), lastTimes().get(SN));
     }
 
@@ -159,8 +156,8 @@ class InclineVibrationFilterTest {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"),
                 record(6.1, "2026-11-01 03:00:00"), record(0.11, "2026-11-01 04:00:00"));
         var data = org.mockito.ArgumentCaptor.forClass(com.company.cbf.starter.data.entity.MqttData.class);
-        verify(archive, times(4)).saveBeforeForward(eq(vibration), eq(SN), any(), data.capture());
-        verify(forward, times(4)).push(eq(CODE), any());
+        verify(archive, times(4)).saveCollectedData(eq(vibration), eq(SN), any(), data.capture());
+        verifyStored(CODE, times(4));
         assertEquals("2026-11-01 02:00:00.000", data.getAllValues().get(1).getValue().get(0).get(0));
         assertEquals("2026-11-01 03:00:00.000", data.getAllValues().get(2).getValue().get(0).get(0));
     }
@@ -170,7 +167,7 @@ class InclineVibrationFilterTest {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"),
                 record(1.0, "2026-11-01 03:00:00"), record(0.1, "2026-11-01 04:00:00"),
                 record(0.15, "2026-11-01 05:00:00"), record(0.1, "2026-11-01 06:00:00"));
-        verify(forward, times(6)).push(eq(CODE), any());
+        verifyStored(CODE, times(6));
     }
 
     @ParameterizedTest
@@ -179,7 +176,7 @@ class InclineVibrationFilterTest {
         var peak = record(6, "2026-11-01 02:00:00");
         peak.setAlarmStatus(status);
         process(List.of(vibration), record(0.1, TIME), peak, record(0.11, "2026-11-01 03:00:00"));
-        verify(forward, times(3)).push(eq(CODE), any());
+        verifyStored(CODE, times(3));
     }
 
     @ParameterizedTest
@@ -189,7 +186,7 @@ class InclineVibrationFilterTest {
         var peak = record(6, "2026-11-01 02:00:00");
         peak.setRunStatus(status);
         process(List.of(vibration), record(0.1, TIME), peak, record(0.11, "2026-11-01 03:00:00"));
-        verify(forward, times(3)).push(eq(CODE), any());
+        verifyStored(CODE, times(3));
     }
 
     @Test
@@ -197,7 +194,7 @@ class InclineVibrationFilterTest {
         var next = record(0.11, "2026-11-01 03:00:00");
         next.setAlarmStatus(2);
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"), next);
-        verify(forward, times(3)).push(eq(CODE), any());
+        verifyStored(CODE, times(3));
     }
 
     @Test
@@ -207,14 +204,14 @@ class InclineVibrationFilterTest {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 02:00:00"), missing,
                 record(0.11, "2026-11-01 04:00:00"), record(6, "2026-11-01 05:00:00"),
                 record(0.1, "2026-11-01 07:00:00"));
-        verify(forward, times(5)).push(eq(CODE), any());
+        verifyStored(CODE, times(5));
     }
 
     @Test
     void doesNotStageAPeakWithoutARecentPreviousNeighbor() {
         process(List.of(vibration), record(0.1, TIME), record(6, "2026-11-01 03:00:00"),
                 record(0.1, "2026-11-01 04:00:00"));
-        verify(forward, times(3)).push(eq(CODE), any());
+        verifyStored(CODE, times(3));
     }
 
     @Test
@@ -222,16 +219,16 @@ class InclineVibrationFilterTest {
         var peak = record(6, "2026-11-01 02:00:00");
         process(List.of(vibration), record(0.1, TIME), peak);
         handler.flushPendingVibrationData();
-        verify(forward).push(eq(CODE), any());
+        verifyStored(CODE, times(1));
 
         when(clock.millis()).thenReturn(config.getMaxGapSeconds() * 1000L);
         doThrow(new IllegalStateException("database unavailable")).doNothing()
-                .when(archive).saveBeforeForward(eq(vibration), eq(SN), same(peak), any());
+                .when(archive).saveCollectedData(eq(vibration), eq(SN), same(peak), any());
         assertThrows(IllegalStateException.class, handler::flushPendingVibrationData);
         handler.flushPendingVibrationData();
         handler.flushPendingVibrationData();
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(archive, times(2)).saveBeforeForward(eq(vibration), eq(SN), same(peak), any());
+        verifyStored(CODE, times(3));
+        verify(archive, times(2)).saveCollectedData(eq(vibration), eq(SN), same(peak), any());
         assertEquals(peak.getTm(), cache.getLatestData(CODE).getDataTime());
     }
 
@@ -241,12 +238,12 @@ class InclineVibrationFilterTest {
         var peak = record(6, "2026-11-01 02:00:00");
         process(List.of(vibration), record(0.1, TIME), peak);
         doThrow(new IllegalStateException("database unavailable")).doNothing()
-                .when(archive).saveBeforeForward(eq(vibration), eq(SN), same(next), any());
+                .when(archive).saveCollectedData(eq(vibration), eq(SN), same(next), any());
         assertThrows(IllegalStateException.class, () -> process(List.of(vibration), next));
         assertEquals(DateUtil.parse(peak.getTm()), lastTimes().get(SN));
         process(List.of(vibration), next);
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(eq(vibration), eq(SN), same(peak), any());
+        verifyStored(CODE, times(3));
+        verify(archive, never()).saveCollectedData(eq(vibration), eq(SN), same(peak), any());
         assertEquals(next.getTm(), cache.getLatestData(CODE).getDataTime());
     }
 
@@ -256,8 +253,8 @@ class InclineVibrationFilterTest {
         var next = record(0.11, "2026-11-01 03:00:00");
         process(List.of(vibration), peak, record(0.1, TIME));
         process(List.of(vibration), next, peak);
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(eq(vibration), eq(SN), same(peak), any());
+        verifyStored(CODE, times(2));
+        verify(archive, never()).saveCollectedData(eq(vibration), eq(SN), same(peak), any());
     }
 
     @Test
@@ -273,15 +270,15 @@ class InclineVibrationFilterTest {
         response.setData(data);
         ReflectionTestUtils.invokeMethod(handler, "processResponse", List.of(other), response, "OTHER");
         process(List.of(vibration), record(0.11, "2026-11-01 03:00:00"));
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(forward).push(eq(other.getDeviceCode()), any());
+        verifyStored(CODE, times(2));
+        verifyStored(other.getDeviceCode(), times(1));
     }
 
     @Test
     void requestsOldestUnprocessedRecordsWithTheSuppliedTimeRange() throws Exception {
         InclineApiService api = mock(InclineApiService.class);
         when(api.getLoginToken()).thenReturn("test-token");
-        var queryHandler = new InclineDataHandler(null, null, api, forward, cache,
+        var queryHandler = new InclineDataHandler(null, null, api, cache,
                 new VibrationSpikeFilter(config, clock), archive, baselines);
         queryHandler.fetchDeviceData(SN, TIME, "2026-11-01 04:00:00");
         var request = org.mockito.ArgumentCaptor.forClass(com.zd.sdq.entity.dto.incline.InclineHistoryRequest.class);
@@ -300,7 +297,7 @@ class InclineVibrationFilterTest {
         config.setSpikeMinDelta(7);
         config.setSpikeRatio(100);
         process(List.of(vibration), record(0.1, "2026-11-01 03:00:00"), record(6, "2026-11-01 04:00:00"));
-        verify(forward, times(4)).push(eq(CODE), any());
+        verifyStored(CODE, times(4));
     }
 
     @ParameterizedTest
@@ -334,12 +331,12 @@ class InclineVibrationFilterTest {
         var peak = record(-13.95 * VibrationSpikeFilter.MG_TO_M_S2, "2026-11-01 02:00:00");
         process(List.of(vibration), record(-0.66 * VibrationSpikeFilter.MG_TO_M_S2, TIME), peak);
 
-        verify(forward).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(any(), anyString(), same(peak), any());
+        verifyStored(CODE, times(1));
+        verify(archive, never()).saveCollectedData(any(), anyString(), same(peak), any());
         process(List.of(vibration), record(-0.5 * VibrationSpikeFilter.MG_TO_M_S2, "2026-11-01 03:00:00"));
 
-        verify(forward, times(2)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(any(), anyString(), same(peak), any());
+        verifyStored(CODE, times(2));
+        verify(archive, never()).saveCollectedData(any(), anyString(), same(peak), any());
     }
 
     @ParameterizedTest
@@ -349,23 +346,23 @@ class InclineVibrationFilterTest {
         double[] amplitudes = {0.137, 0.09, 1.5, 6.0};
         for (int i = 0; i < count; i++) {
             process(List.of(vibration), record(amplitudes[i], String.format("2026-11-01 %02d:00:00", i + 2)));
-            verify(forward, times(i == 0 ? 1 : i + 2)).push(eq(CODE), any());
+            verifyStored(CODE, times(i == 0 ? 1 : i + 2));
         }
         process(List.of(vibration), record(0.006, String.format("2026-11-01 %02d:00:00", count + 2)));
-        verify(forward, times(count + 2)).push(eq(CODE), any());
+        verifyStored(CODE, times(count + 2));
     }
 
     @Test
     void keepsTwoElevatedSamplesEvenWhenTheFirstIsMuchLarger() {
         process(List.of(vibration), record(0.006, TIME), record(6, "2026-11-01 02:00:00"),
                 record(0.137, "2026-11-01 03:00:00"), record(0.006, "2026-11-01 04:00:00"));
-        verify(forward, times(4)).push(eq(CODE), any());
+        verifyStored(CODE, times(4));
     }
 
     @Test
     void doesNotStageTinyValuesJustBecauseTheirRatioIsLarge() {
         process(List.of(vibration), record(0, TIME), record(0.0001, "2026-11-01 02:00:00"));
-        verify(forward, times(2)).push(eq(CODE), any());
+        verifyStored(CODE, times(2));
     }
 
     @Test
@@ -373,24 +370,24 @@ class InclineVibrationFilterTest {
         process(List.of(vibration), record(0.01, TIME), record(0.01, "2026-11-01 02:00:00"),
                 record(0.01, "2026-11-01 03:00:00"), record(0.0001, "2026-11-01 04:00:00"),
                 record(0.06, "2026-11-01 05:00:00"));
-        verify(forward, times(5)).push(eq(CODE), any());
+        verifyStored(CODE, times(5));
     }
 
     @Test
     void honorsTheConfiguredRatioMinimumIncrementAndNoiseFloor() {
         config.setSpikeRatio(20);
         process(List.of(vibration), record(0.006, TIME), record(0.1, "2026-11-01 02:00:00"));
-        verify(forward, times(2)).push(eq(CODE), any());
+        verifyStored(CODE, times(2));
 
         config.setSpikeRatio(10);
         config.setRelativeMinDelta(0.2);
         process(List.of(vibration), record(0.006, "2026-11-01 03:00:00"), record(0.137, "2026-11-01 04:00:00"));
-        verify(forward, times(4)).push(eq(CODE), any());
+        verifyStored(CODE, times(4));
 
         config.setRelativeMinDelta(0.05);
         config.setNoiseFloor(0.02);
         process(List.of(vibration), record(0, "2026-11-01 05:00:00"), record(0.137, "2026-11-01 06:00:00"));
-        verify(forward, times(6)).push(eq(CODE), any());
+        verifyStored(CODE, times(6));
     }
 
     @Test
@@ -400,9 +397,9 @@ class InclineVibrationFilterTest {
                 record(0.1, "2026-11-01 03:00:00"), record(0.01, "2026-11-01 04:00:00"),
                 record(0.01, "2026-11-01 05:00:00"), record(0.01, "2026-11-01 06:00:00"),
                 record(0.12, "2026-11-01 07:00:00"));
-        verify(forward, times(6)).push(eq(CODE), any());
+        verifyStored(CODE, times(6));
         process(List.of(vibration), record(0.01, "2026-11-01 08:00:00"));
-        verify(forward, times(7)).push(eq(CODE), any());
+        verifyStored(CODE, times(7));
     }
 
     @Test
@@ -412,8 +409,8 @@ class InclineVibrationFilterTest {
                 record(0.006, "2026-11-01 05:00:00"));
         var isolated = record(0.137, "2026-11-01 06:00:00");
         process(List.of(vibration), isolated, record(0.006, "2026-11-01 07:00:00"));
-        verify(forward, times(6)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(any(), anyString(), same(isolated), any());
+        verifyStored(CODE, times(6));
+        verify(archive, never()).saveCollectedData(any(), anyString(), same(isolated), any());
     }
 
     @Test
@@ -423,9 +420,9 @@ class InclineVibrationFilterTest {
         var second = record(0.137, "2026-11-01 04:00:00");
         process(List.of(vibration), record(0.006, TIME), first, record(0.006, "2026-11-01 03:00:00"),
                 second, record(0.006, "2026-11-01 05:00:00"));
-        verify(forward, times(3)).push(eq(CODE), any());
-        verify(archive, never()).saveBeforeForward(any(), anyString(), same(first), any());
-        verify(archive, never()).saveBeforeForward(any(), anyString(), same(second), any());
+        verifyStored(CODE, times(3));
+        verify(archive, never()).saveCollectedData(any(), anyString(), same(first), any());
+        verify(archive, never()).saveCollectedData(any(), anyString(), same(second), any());
     }
 
     @Test
@@ -434,15 +431,15 @@ class InclineVibrationFilterTest {
         var second = record(0.09, "2026-11-01 03:00:00");
         process(List.of(vibration), record(0.006, TIME), first);
         doThrow(new IllegalStateException("database unavailable")).doNothing()
-                .when(archive).saveBeforeForward(eq(vibration), eq(SN), same(second), any());
+                .when(archive).saveCollectedData(eq(vibration), eq(SN), same(second), any());
 
         assertThrows(IllegalStateException.class, () -> process(List.of(vibration), second));
         assertEquals(DateUtil.parse(first.getTm()), lastTimes().get(SN));
         process(List.of(vibration), second, record(1.5, "2026-11-01 04:00:00"),
                 record(0.006, "2026-11-01 05:00:00"));
 
-        verify(archive, times(2)).saveBeforeForward(eq(vibration), eq(SN), same(first), any());
-        verify(forward, times(6)).push(eq(CODE), any());
+        verify(archive, times(2)).saveCollectedData(eq(vibration), eq(SN), same(first), any());
+        verifyStored(CODE, times(7));
     }
 
     @ParameterizedTest
@@ -467,6 +464,11 @@ class InclineVibrationFilterTest {
     void rejectsInvalidBaselineWindowSizes(int size) {
         config.setBaselineWindowSize(size);
         assertThrows(IllegalArgumentException.class, config::validate);
+    }
+
+    private void verifyStored(String deviceCode, org.mockito.verification.VerificationMode mode) {
+        verify(archive, mode).saveCollectedData(
+                argThat(device -> deviceCode.equals(device.getDeviceCode())), anyString(), any(), any());
     }
 
     private DeviceInfoExt device(String code, DeviceType type) {

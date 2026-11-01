@@ -55,7 +55,7 @@ class InclineForwardDataTest {
                 .currentTime().monitoringCode(device.getDeviceCode())
                 .addData(ZonedDateTime.now(), "0.123457", "-0.987654", "20.123").build();
 
-        service.saveBeforeForward(device, "1524020712", record, mqttData);
+        service.saveCollectedData(device, "1524020712", record, mqttData);
 
         // 使用独立连接读取，验证 MyBatis insert 已提交、字段映射与表结构一致。
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);

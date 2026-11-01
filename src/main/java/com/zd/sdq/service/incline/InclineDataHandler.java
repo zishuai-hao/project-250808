@@ -7,7 +7,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.company.cbf.starter.data.constant.NetworkGatewayType;
 import com.company.cbf.starter.data.entity.DeviceInfo;
 import com.company.cbf.starter.data.entity.MqttData;
-import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
 import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
@@ -29,6 +28,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -45,7 +45,6 @@ public class InclineDataHandler {
     private final Vertx vertx;
     private final DeviceInfoExtMapper deviceInfoExtMapper;
     private final InclineApiService inclineApiService;
-    private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceLatestDataCache deviceLatestDataCache;
     private final VibrationSpikeFilter vibrationSpikeFilter;
     private final InclineForwardDataService inclineForwardDataService;
@@ -57,7 +56,7 @@ public class InclineDataHandler {
     private static final NetworkGatewayType GATEWAY_TYPE_HTTP_CLIENT = NetworkGatewayType.HTTP_CLIENT;
 
     /**
-     * 查询间隔：5分钟
+     * 查询间隔：2分钟，独立于平台定时上报频率。
      */
     private static final int QUERY_INTERVAL_MS = 2 * 60 * 1000;
 
@@ -101,11 +100,13 @@ public class InclineDataHandler {
                 // 计算延迟时间
                 long delayMs = (long) index++ * (QUERY_INTERVAL_MS / remoteDeviceIdGroup.size());
                 remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, currentTime);
+                AtomicBoolean querying = new AtomicBoolean();
                 log.debug("初始化远程设备[{}]的最新数据时间: {}",
                         remoteDeviceId, DateUtil.formatDateTime(currentTime));
 
                 // vertx 定时器 - 使用 executeBlocking 避免阻塞 Event Loop 线程
                 vertx.setPeriodic(delayMs, QUERY_INTERVAL_MS, id -> {
+                    if (!querying.compareAndSet(false, true)) return;
                     // 将阻塞的 HTTP 调用放到 Worker 线程池中执行
                     vertx.executeBlocking(promise -> {
                         try {
@@ -113,23 +114,16 @@ public class InclineDataHandler {
                             InclineHistoryResponse response = fetchDeviceData(remoteDeviceId,
                                     DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)),
                                     DateUtil.formatDateTime(new Date()));
-                            promise.complete(response);
+                            // 解析、过滤和SQLite写入也在Worker线程中完成。
+                            processResponse(devices, response, remoteDeviceId);
+                            promise.complete();
                         } catch (Exception e) {
                             log.error("查询远程设备[{}]数据时发生异常", remoteDeviceId, e);
                             promise.fail(e);
                         }
                     }, false, res -> {
-                        // 在 Event Loop 线程中处理响应结果
-                        if (res.succeeded()) {
-                            InclineHistoryResponse response = (InclineHistoryResponse) res.result();
-                            try {
-                                processResponse(devices, response, remoteDeviceId);
-                            } catch (Exception e) {
-                                log.error("远程设备[{}]数据保存或转发失败，下轮从上次完成的位置重试", remoteDeviceId, e);
-                            }
-                        } else {
-                            log.error("远程设备[{}]数据查询失败", remoteDeviceId, res.cause());
-                        }
+                        querying.set(false);
+                        if (res.failed()) log.error("远程设备[{}]采集或入库失败，下轮继续查询", remoteDeviceId, res.cause());
                     });
                 });
             }
@@ -240,22 +234,25 @@ public class InclineDataHandler {
                         remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
                 continue;
             }
-//            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
-            // 使用当前时间作为标准
-            ZonedDateTime zonedDateTime = ZonedDateTime.now(zoneId);
+            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(),
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
 
             // 将远程传感器的数据分配到两个本地设备中
             for (DeviceInfoExt device : devices) {
                 // 如果是 VIB 设备，则发送加速度最大值数据
                 if (device.getDeviceType().equals(DeviceType.VIB)) {
-                    vibrationSpikeFilter.process(device, record, this::forwardVibration);
+                    vibrationSpikeFilter.process(device, record, this::saveVibration);
                 }
                 // 如果是 INC 设备，则发送角度数据和温度数据
                 else if (device.getDeviceType().equals(DeviceType.INC)) {
+                    if (!finite(record.getAngleX()) || !finite(record.getAngleY()) || !finite(record.getTemp())) {
+                        log.warn("跳过无效倾角采集值，测点: {}，采集时间: {}", device.getDeviceCode(), record.getTm());
+                        continue;
+                    }
                     InclineBaselineService.CorrectedAngles angles = inclineBaselineService.apply(
                             device.getDeviceCode(), record.getAngleX(), record.getAngleY());
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
-                    builder.currentTime();
+                    builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
                     builder.monitoringCode(device.getDeviceCode());
                     builder.addData(
                             zonedDateTime,
@@ -264,9 +261,7 @@ public class InclineDataHandler {
                             NumberUtil.roundStr(record.getTemp(), 3));
                     MqttData mqttData = builder.build();
 
-                    inclineForwardDataService.saveBeforeForward(device, remoteDeviceId, record, mqttData);
-                    // 保存成功后再发送数据到缓冲转发适配器
-                    bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
+                    inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
                     Map<String, Object> latestData = new LinkedHashMap<>();
                     latestData.put("angleX", NumberUtil.roundStr(angles.angleX(), 6));
                     latestData.put("angleY", NumberUtil.roundStr(angles.angleY(), 6));
@@ -296,23 +291,26 @@ public class InclineDataHandler {
 
     @Scheduled(fixedDelay = 60_000)
     public void flushPendingVibrationData() {
-        vibrationSpikeFilter.flushExpired(this::forwardVibration);
+        vibrationSpikeFilter.flushExpired(this::saveVibration);
     }
 
-    private void forwardVibration(VibrationSpikeFilter.Sample sample) {
+    private boolean finite(Double value) {
+        return value != null && Double.isFinite(value);
+    }
+
+    private void saveVibration(VibrationSpikeFilter.Sample sample) {
         DeviceInfoExt device = sample.device();
         InclineHistoryResponse.InclineRecord record = sample.record();
         String accelerationValue = NumberUtil.roundStr(record.getAccMaxZ() * VibrationSpikeFilter.MG_TO_M_S2, 4);
-        // 待确认点延后转发时仍使用原始采集时间，避免与后续点挤到同一个时间戳。
+        // 延后放行仍保存原始采集时间，不能因晚入库而延长上报有效期。
         ZonedDateTime sampleTime = LocalDateTime.parse(record.getTm(),
                 DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
         MqttDataBuilder builder = new MqttDataBuilder(DeviceType.VIB);
-        builder.currentTime();
+        builder.sampleTime(sampleTime.toInstant().toEpochMilli());
         builder.monitoringCode(device.getDeviceCode());
         builder.addData(sampleTime, accelerationValue);
         MqttData mqttData = builder.build();
-        inclineForwardDataService.saveBeforeForward(device, device.getRemoteDeviceId(), record, mqttData);
-        bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
+        inclineForwardDataService.saveCollectedData(device, device.getRemoteDeviceId(), record, mqttData);
 
         Map<String, Object> latestData = new LinkedHashMap<>();
         latestData.put("accMaxZ", accelerationValue);

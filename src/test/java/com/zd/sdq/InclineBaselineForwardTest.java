@@ -2,7 +2,6 @@ package com.zd.sdq;
 
 import cn.hutool.core.date.DateUtil;
 import com.company.cbf.starter.data.entity.MqttData;
-import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.config.VibrationFilterConfig;
@@ -32,12 +31,11 @@ class InclineBaselineForwardTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void forwardsRelativeAnglesButPreservesRawRecordTemperatureAndVibration() throws Exception {
+    void storesRelativeAnglesButPreservesRawRecordTemperatureAndVibration() throws Exception {
         InclineBaselineService baselines = InclineBaselineTest.database(directory.resolve("devices.db")).service();
         DeviceLatestDataCache cache = new DeviceLatestDataCache();
-        BufferForwardMqttClientAdapter mqtt = mock(BufferForwardMqttClientAdapter.class);
         InclineForwardDataService snapshots = mock(InclineForwardDataService.class);
-        InclineDataHandler handler = new InclineDataHandler(null, null, null, mqtt, cache,
+        InclineDataHandler handler = new InclineDataHandler(null, null, null, cache,
                 new VibrationSpikeFilter(new VibrationFilterConfig()), snapshots, baselines);
         Map<String, Date> cursor = (Map<String, Date>) ReflectionTestUtils.getField(handler,
                 "remoteDeviceIdLastDataTimeMap");
@@ -60,18 +58,18 @@ class InclineBaselineForwardTest {
             if (pass == 1) baselines.save("TEST-INC", 1.0, -2.0);
             if (pass == 2) baselines.remove("TEST-INC");
             cursor.put("SN", DateUtil.parse("2026-11-01 00:00:00"));
-            clearInvocations(mqtt, snapshots);
+            clearInvocations(snapshots);
             ReflectionTestUtils.invokeMethod(handler, "processResponse", List.of(incline, vibration), response, "SN");
 
             ArgumentCaptor<MqttData> payload = ArgumentCaptor.forClass(MqttData.class);
-            verify(snapshots).saveBeforeForward(eq(incline), eq("SN"), same(record), payload.capture());
+            verify(snapshots).saveCollectedData(eq(incline), eq("SN"), same(record), payload.capture());
             var values = payload.getValue().getValue();
+            assertEquals(record.getTm() + ".000", values.get(0).get(0));
             assertEquals(List.of(pass == 1 ? "0.234568" : "1.234568",
                     pass == 1 ? "-0.987654" : "-2.987654", "20.123"), values.get(0).subList(1, 4));
-            verify(mqtt).push(incline.getDeviceCode(), values);
-            verify(snapshots).saveBeforeForward(eq(vibration), eq("SN"), same(record), payload.capture());
+
+            verify(snapshots).saveCollectedData(eq(vibration), eq("SN"), same(record), payload.capture());
             assertEquals("0.2157", payload.getValue().getValue().get(0).get(1));
-            verify(mqtt).push(vibration.getDeviceCode(), payload.getValue().getValue());
 
             var latest = cache.getLatestData("TEST-INC").getLatestData();
             assertEquals(1.23456789, latest.get("rawAngleX"));

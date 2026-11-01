@@ -30,7 +30,7 @@ public class WaterLevelData {
     private String deviceCode;
     
     /**
-     * 水位值（米）
+     * 基准减原始水位的差值（米），沿用既有字段含义。
      */
     private Double waterLevel;
     
@@ -43,5 +43,8 @@ public class WaterLevelData {
      * 创建时间
      */
     private String createTime;
+
+    /** 采集时固定的上报值 JSON，包含差值和原始水位；旧记录可为空。 */
+    private String payload;
 }
 

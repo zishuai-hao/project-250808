@@ -2,11 +2,9 @@ package com.zd.sdq.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.company.cbf.starter.data.entity.DeviceInfo;
-import com.company.cbf.starter.data.service.forward.BufferForwardMqttClientAdapter;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.mapper.DeviceInfoExtMapper;
-import com.zd.sdq.mapper.WaterLevelDataMapper;
 import io.vertx.core.Vertx;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -30,9 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RadarWaterLevelServerManager {
 
     private final DeviceInfoExtMapper deviceInfoExtMapper;
-    private final BufferForwardMqttClientAdapter mqttAdapter;
     private final Vertx vertx;
-    private final WaterLevelDataMapper  waterLevelDataMapper;
+    private final WaterLevelDataService waterLevelDataService;
     private final DeviceLatestDataCache deviceLatestDataCache;
 
     /**
@@ -135,7 +132,7 @@ public class RadarWaterLevelServerManager {
         try {
             // 创建并启动TCP服务器
             server = new SingleDeviceRadarWaterLevelServer(
-                    device, mqttAdapter, vertx, deviceInfoExtMapper, waterLevelDataMapper, deviceLatestDataCache);
+                    device, vertx, deviceInfoExtMapper, waterLevelDataService, deviceLatestDataCache);
             server.start();
 
             // 启动成功后才添加到管理列表
