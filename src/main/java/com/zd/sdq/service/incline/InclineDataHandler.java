@@ -49,6 +49,7 @@ public class InclineDataHandler {
     private final VibrationSpikeFilter vibrationSpikeFilter;
     private final InclineForwardDataService inclineForwardDataService;
     private final InclineBaselineService inclineBaselineService;
+    private final InclineFluctuationService inclineFluctuationService;
 
     /**
      * HTTP-Client 网关类型标识
@@ -249,8 +250,10 @@ public class InclineDataHandler {
                         log.warn("跳过无效倾角采集值，测点: {}，采集时间: {}", device.getDeviceCode(), record.getTm());
                         continue;
                     }
-                    InclineBaselineService.CorrectedAngles angles = inclineBaselineService.apply(
+                    var amplified = inclineFluctuationService.apply(
                             device.getDeviceCode(), record.getAngleX(), record.getAngleY());
+                    InclineBaselineService.CorrectedAngles angles = inclineBaselineService.apply(
+                            device.getDeviceCode(), amplified.x(), amplified.y());
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
                     builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
                     builder.monitoringCode(device.getDeviceCode());

@@ -7,6 +7,8 @@ logging:
     httpDataLog: debug  # HTTP数据日志级别
 
 spring:
+  config:
+    import: classpath:incline-fluctuation.yml
   datasource:
     # 根据情况决定是否启用 ?journal_mode=WAL
     url: jdbc:sqlite:./zd.db?synchronous=NORMAL&busy_timeout=30000&cache_size=10000&temp_store=MEMORY

@@ -3,6 +3,8 @@ package com.zd.sdq;
 import cn.hutool.core.date.DateUtil;
 import com.company.cbf.starter.data.entity.MqttData;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
+import com.zd.sdq.config.InclineFluctuationConfig;
+import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.config.VibrationFilterConfig;
 import com.zd.sdq.service.incline.VibrationSpikeFilter;
@@ -36,7 +38,8 @@ class InclineBaselineForwardTest {
         DeviceLatestDataCache cache = new DeviceLatestDataCache();
         InclineForwardDataService snapshots = mock(InclineForwardDataService.class);
         InclineDataHandler handler = new InclineDataHandler(null, null, null, cache,
-                new VibrationSpikeFilter(new VibrationFilterConfig()), snapshots, baselines);
+                new VibrationSpikeFilter(new VibrationFilterConfig()), snapshots, baselines,
+                new InclineFluctuationService(new InclineFluctuationConfig()));
         Map<String, Date> cursor = (Map<String, Date>) ReflectionTestUtils.getField(handler,
                 "remoteDeviceIdLastDataTimeMap");
         DeviceInfoExt incline = device("TEST-INC", DeviceType.INC);

@@ -399,10 +399,10 @@
     <form id="baseline-form">
         <h2 id="baseline-title">设置倾角基准</h2>
         <div id="baseline-device" class="device-code"></div>
-        <p class="muted">转发角度 = 原始角度 − 基准值。保存后从下一条采集数据生效，历史记录保持原值。温度不扣减。</p>
+        <p class="muted">入库角度 = 固定中心 +（原始角度 − 固定中心）× 倍率 − 零点基准。放大未启用时使用原始角度扣零。保存后从下一条采集生效，历史记录保持原值。</p>
         <label>X 轴基准（°）<input id="baseline-x" type="number" step="any" required></label>
         <label>Y 轴基准（°）<input id="baseline-y" type="number" step="any" required></label>
-        <button id="baseline-use-current" type="button" class="secondary">使用最新原始值</button>
+        <button id="baseline-use-current" type="button" class="secondary">使用最新角度设零点</button>
         <p id="baseline-sample-time" class="muted"></p>
         <p id="baseline-error" class="error" role="alert"></p>
         <div class="baseline-actions">
@@ -475,7 +475,7 @@
             ${baseline ? `<div>X: ${formatValue(baseline.angleX)}</div>
                 <div>Y: ${formatValue(baseline.angleY)}</div>
                 <div class="muted">${escapeHtml(new Date(baseline.updatedAt).toLocaleString())}</div>`
-                : '<div class="muted">未设置，转发原始角度</div>'}
+                : '<div class="muted">未设置零点基准</div>'}
             <button type="button" class="secondary" data-baseline-device="${escapeHtml(device.deviceCode)}">
                 ${baseline ? "修改基准" : "设置基准"}
             </button>
@@ -501,33 +501,42 @@
         return state.devices.find(device => device.deviceCode === state.baselineDeviceCode);
     }
 
-    function hasRawAngles(device) {
+    function currentZeroAngles(device) {
         const data = device?.latestData || {};
-        return typeof data.rawAngleX === "number" && Number.isFinite(data.rawAngleX)
-            && typeof data.rawAngleY === "number" && Number.isFinite(data.rawAngleY);
+        if (data.angleX === null || data.angleX === undefined || data.angleX === ""
+            || data.angleY === null || data.angleY === undefined || data.angleY === "") return null;
+        const zeroX = data.baselineApplied ? data.baselineX : 0;
+        const zeroY = data.baselineApplied ? data.baselineY : 0;
+        if (typeof zeroX !== "number" || !Number.isFinite(zeroX)
+            || typeof zeroY !== "number" || !Number.isFinite(zeroY)) return null;
+        const x = Number(data.angleX) + zeroX;
+        const y = Number(data.angleY) + zeroY;
+        return Number.isFinite(x) && Number.isFinite(y) ? {x, y} : null;
     }
 
     function openBaseline(deviceCode) {
         state.baselineDeviceCode = deviceCode;
         const baseline = state.baselines[deviceCode];
         const device = currentBaselineDevice();
+        const angles = currentZeroAngles(device);
         baselineFields.device.textContent = deviceCode;
         baselineFields.x.value = baseline?.angleX ?? "";
         baselineFields.y.value = baseline?.angleY ?? "";
         baselineFields.error.textContent = "";
-        baselineFields.sampleTime.textContent = hasRawAngles(device)
-            ? `可选原始数据时间：${device.dataTime}（${device.statusText}）` : "暂无原始数据，可手动填写基准。";
-        baselineFields.useCurrent.disabled = !hasRawAngles(device);
+        baselineFields.sampleTime.textContent = angles
+            ? `可选扣零前角度，时间：${device.dataTime}（${device.statusText}）` : "暂无可用角度，可手动填写基准。";
+        baselineFields.useCurrent.disabled = !angles;
         baselineFields.remove.disabled = !baseline;
         baselineFields.dialog.showModal();
     }
 
     baselineFields.useCurrent.addEventListener("click", () => {
         const device = currentBaselineDevice();
-        if (hasRawAngles(device)) {
-            baselineFields.x.value = device.latestData.rawAngleX;
-            baselineFields.y.value = device.latestData.rawAngleY;
-            baselineFields.sampleTime.textContent = `已填写原始数据，时间：${device.dataTime}（${device.statusText}）`;
+        const angles = currentZeroAngles(device);
+        if (angles) {
+            baselineFields.x.value = angles.x;
+            baselineFields.y.value = angles.y;
+            baselineFields.sampleTime.textContent = `已填写扣零前角度，时间：${device.dataTime}（${device.statusText}）`;
         }
     });
 

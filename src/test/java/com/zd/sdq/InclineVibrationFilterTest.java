@@ -3,6 +3,8 @@ package com.zd.sdq;
 import cn.hutool.core.date.DateUtil;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.zd.sdq.config.VibrationFilterConfig;
+import com.zd.sdq.config.InclineFluctuationConfig;
+import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
 import com.zd.sdq.service.DeviceLatestDataCache;
@@ -46,7 +48,8 @@ class InclineVibrationFilterTest {
     @BeforeEach
     void setUp() {
         handler = new InclineDataHandler(null, null, null, cache,
-                new VibrationSpikeFilter(config, clock), archive, baselines);
+                new VibrationSpikeFilter(config, clock), archive, baselines,
+                new InclineFluctuationService(new InclineFluctuationConfig()));
         Map<String, Date> lastTimes = lastTimes();
         lastTimes.put(SN, DateUtil.parse(START));
         vibration = device(CODE, DeviceType.VIB);
@@ -279,7 +282,8 @@ class InclineVibrationFilterTest {
         InclineApiService api = mock(InclineApiService.class);
         when(api.getLoginToken()).thenReturn("test-token");
         var queryHandler = new InclineDataHandler(null, null, api, cache,
-                new VibrationSpikeFilter(config, clock), archive, baselines);
+                new VibrationSpikeFilter(config, clock), archive, baselines,
+                new InclineFluctuationService(new InclineFluctuationConfig()));
         queryHandler.fetchDeviceData(SN, TIME, "2026-11-01 04:00:00");
         var request = org.mockito.ArgumentCaptor.forClass(com.zd.sdq.entity.dto.incline.InclineHistoryRequest.class);
         verify(api).getHistoryData(request.capture());

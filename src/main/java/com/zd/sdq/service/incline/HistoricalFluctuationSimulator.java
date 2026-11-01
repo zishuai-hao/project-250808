@@ -34,6 +34,7 @@ public class HistoricalFluctuationSimulator {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final InclineForwardDataMapper mapper;
     private final ObjectMapper json;
+    private final InclineFluctuationService inclineFluctuationService;
 
     public record Result(List<String> numbers, int trainingCount) { }
     private record Point(Instant time, double[] numbers, double[] baseline, JsonNode zero) { }
@@ -95,8 +96,10 @@ public class HistoricalFluctuationSimulator {
             if (!raw.path("angleX").isNumber() || !raw.path("angleY").isNumber()) {
                 throw new IllegalArgumentException("缺少原始倾角，不能识别基准切换");
             }
-            baseline = new double[]{raw.path("angleX").asDouble() - numbers[0],
-                    raw.path("angleY").asDouble() - numbers[1]};
+            // payload已经放大，需在同一角度域识别零点变化，不能将真实波动误认为每条都换了零点。
+            var amplified = inclineFluctuationService.apply(row.getDeviceCode(),
+                    raw.path("angleX").asDouble(), raw.path("angleY").asDouble());
+            baseline = new double[]{amplified.x() - numbers[0], amplified.y() - numbers[1]};
             if (!Double.isFinite(baseline[0]) || !Double.isFinite(baseline[1])) {
                 throw new IllegalArgumentException("无效倾角基准");
             }

@@ -7,6 +7,8 @@ import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zd.sdq.config.DeviceReportConfig;
+import com.zd.sdq.config.InclineFluctuationConfig;
+import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.dto.SimulatedMqttData;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
@@ -78,7 +80,8 @@ class DeviceScheduledReportTest {
         waterStore = new WaterLevelDataService(waterMapper, json, source);
         waterStore.initTable();
         reports = new DeviceScheduledReportService(config, inclineMapper, waterMapper, json, sender,
-                new HistoricalFluctuationSimulator(inclineMapper, json));
+                new HistoricalFluctuationSimulator(inclineMapper, json,
+                        new InclineFluctuationService(new InclineFluctuationConfig())));
     }
 
     @Test
@@ -285,7 +288,8 @@ class DeviceScheduledReportTest {
         learnedHistory("A", "INC", "2026-11-01 08:00:00", 0.123456);
         var mapper = (InclineForwardDataMapper) ReflectionTestUtils.getField(inclineStore, "mapper");
         var anchor = mapper.selectLatestForReport("2026-11-01 06:00:00", "2026-11-01 08:00:00").get(0);
-        var learner = new HistoricalFluctuationSimulator(mapper, json);
+        var learner = new HistoricalFluctuationSimulator(mapper, json,
+                    new InclineFluctuationService(new InclineFluctuationConfig()));
         var before = learner.simulate(anchor, T, config.getInclineVib().getSimulation()).orElseThrow();
         assertEquals(6, before.trainingCount()); // 同一时间重复入库不会变成额外样本
         sample("A", "INC", "2026-11-01 09:00:00", "999"); // 锚点之后不能用于学习

@@ -71,8 +71,8 @@ LIMIT 100;
 
 倾角固定基准：
 
-- 在 `/device-status.html` 的 INC 设备行点击“设置基准”，可手动填写 X/Y 基准，或点击“使用最新原始值”后保存。界面会显示所选原始数据的时间和状态，便于核对后设置。
-- 基准按 INC 设备编号独立保存，单位为度。设置后，后续转发及状态页 `angleX`、`angleY` 使用“原始角度 − 对应轴基准”；未设置或清除基准时使用原始角度。温度、VIB、水位不参与此扣减。
+- 在 `/device-status.html` 的 INC 设备行点击“设置基准”，可手动填写 X/Y 基准，或点击“使用最新角度设零点”后保存。该操作从现有angleX/Y加回采集时零点基准，得到扣零前角度；启用放大时即为放大后的角度。界面显示所选数据的时间和状态。
+- 基准按 INC 设备编号独立保存，单位为度。设置后，后续转发及状态页 `angleX`、`angleY` 使用“放大后角度 − 对应轴零点基准”（未启用放大时为原始角度扣零）；未设置或清除基准时不扣零。温度、VIB、水位不参与此扣减。
 - 状态页的 `rawAngleX`、`rawAngleY` 保留原始值；采集快照的 `raw_data` 也保留原始记录，`payload` 留存采集时的扣减结果。原始记录不会被改写，基准不会随每次采集自动滚动。
 - 基准保存在现有设备表 `s_device_info_ext` 的 `incline_baseline` 字段中，SQLite 使用 `TEXT` 存储 JSON。应用启动时自动补充该字段，不修改原有水位 `baseline` 字段。每次采集读取最新基准，无需重启；修改后从下一条采集数据生效，不重算历史记录。
 - 每台设备的一行保存该设备的基准，字段为 `NULL` 时不扣减。JSON 包含 `angleX`、`angleY` 和 `updatedAt`（UTC 设置时间），例如：
@@ -89,7 +89,18 @@ LIMIT 100;
 
 - `GET /api/incline-baselines`：查询全部固定基准。
 - `PUT /api/incline-baselines/{deviceCode}`，JSON 请求体 `{"angleX":1.5,"angleY":-2.56}`：创建或替换该设备的基准，两个轴均必填，零值有效。
-- `DELETE /api/incline-baselines/{deviceCode}`：清除该设备基准，后续恢复转发原始角度。
+- `DELETE /api/incline-baselines/{deviceCode}`：清除该设备零点基准，后续不再扣零，固定中心放大仍按配置执行。
+
+倾角统一2倍入库：
+
+- 所有40台倾角设备的X/Y轴统一使用2倍：`入库角度 = b + (raw - b) * factor - z`。`b` 为固定放大中心，`z` 为现有零点基准（未设置时为0）。例如 `b=1.5°`、`z=0`，原始 `1.5001°` 入库为 `1.5002°`。
+- 在原始采集构建 `payload` 之前只计算一次，结果直接写入现有 `payload` 的X/Y角度位置，并更新现有状态缓存 `angleX/Y`。不增加数据库列、MQTT列、DTO或状态接口字段。定时上报直接使用入库值，不再重复放大。
+- `raw_data`、`rawAngleX/Y` 保留原始值；温度、振动、水位及设备原始报警/运行状态沿用现有处理。只影响后续采集，不重算或覆盖历史快照。
+- `application.yml` 默认导入 `incline-fluctuation.yml`，启用 `incline.fluctuation.enabled=true`、`factor=2`。全部轴使用同一个倍率；每台设备X/Y固定中心取2026-10-25至2026-11-01窗口正常原始角度均值（6位小数），重启、刷新和后续采集均不改变中心。
+- `incline.fluctuation.enabled=false` 可关闭放大，`factor=1` 保持原倍率；修改配置需重启。未配置中心的新设备保持原值，不自动选取首条/上一条值。换设备、换轴或重新置零后应重新核对中心与零点基准。
+- 历史模拟使用入库后的 `payload` 学习波动，输出不再额外放大。判断零点窗口时，对原始角度应用同一放大公式后再与 `payload` 比较；处理不一致时截断历史，正常历史不足则跳过，避免正常波动被误认为每条都切换零点。
+- 这是数值放大，不是灵敏度标定，会同时放大长期漂移与噪声，不能恢复分辨率或证明设备有效。全部80轴固定中心与倍率对照见 [评估报告](document/incline-fluctuation-assessment/assessment.md)。
+- 离线复算：`python3 scripts/analyze_incline_fluctuation.py <ZIP路径> --output <报告目录> --config <配置YAML路径>`，默认2倍；脚本只读源ZIP，不访问设备或修改正在运行的服务。
 
 振动孤立尖峰过滤：
 

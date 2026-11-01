@@ -3,6 +3,8 @@ package com.zd.sdq;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.zd.sdq.config.DeviceReportConfig;
+import com.zd.sdq.config.InclineFluctuationConfig;
+import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.InclineForwardData;
 import com.zd.sdq.entity.dto.DeviceReportSample;
 import com.zd.sdq.mapper.InclineForwardDataMapper;
@@ -29,7 +31,8 @@ class HistoricalFluctuationSimulatorTest {
     private final ObjectMapper json = new ObjectMapper();
     private final InclineForwardDataMapper mapper = mock(InclineForwardDataMapper.class);
     private final DeviceReportConfig.Simulation config = new DeviceReportConfig.Simulation();
-    private final HistoricalFluctuationSimulator simulator = new HistoricalFluctuationSimulator(mapper, json);
+    private final HistoricalFluctuationSimulator simulator = new HistoricalFluctuationSimulator(mapper, json,
+                    new InclineFluctuationService(new InclineFluctuationConfig()));
     private List<InclineForwardData> rows;
 
     @BeforeEach
@@ -45,7 +48,8 @@ class HistoricalFluctuationSimulatorTest {
         double previous = Double.NaN;
         for (int hour = 2; hour <= 4; hour++) {
             var result = simulator.simulate(sample, SOURCE.plusSeconds(hour * 3600L), config).orElseThrow();
-            var restarted = new HistoricalFluctuationSimulator(mapper, json)
+            var restarted = new HistoricalFluctuationSimulator(mapper, json,
+                    new InclineFluctuationService(new InclineFluctuationConfig()))
                     .simulate(sample, SOURCE.plusSeconds(hour * 3600L), config).orElseThrow();
             assertEquals(result, restarted);
             assertEquals(8, result.trainingCount());
@@ -115,6 +119,40 @@ class HistoricalFluctuationSimulatorTest {
         raw.put("angleX", raw.path("angleX").asDouble() + 1);
         rows.get(1).setRawData(raw.toString());
         assertTrue(simulator.simulate(sample, SOURCE.plusSeconds(7200), config).isEmpty());
+    }
+
+    @Test
+    void learnsAlreadyAmplifiedPayloadWithoutApplyingTheFactorAgainAndStopsAtOldUnscaledHistory() throws Exception {
+        var amplification = new InclineFluctuationConfig();
+        amplification.setEnabled(true);
+        var center = new InclineFluctuationConfig.Center();
+        center.setX(0.0);
+        center.setY(0.0);
+        amplification.getCenters().put("TEST", center);
+        var learner = new HistoricalFluctuationSimulator(mapper, json,
+                new InclineFluctuationService(amplification));
+        var sample = history(true, new double[]{0.01, 0.012, 0.011, 0.014, 0.013, 0.011, 0.015, 0.012});
+        for (var row : rows) row.setDeviceCode("TEST");
+        assertTrue(learner.simulate(sample, SOURCE.plusSeconds(7200), config).isEmpty(),
+                "不能把旧的未放大历史与当前2倍处理视为同一零点窗口");
+        for (var row : rows) {
+            var payload = json.readTree(row.getPayload());
+            var values = (com.fasterxml.jackson.databind.node.ArrayNode) payload.get(0);
+            values.set(1, json.getNodeFactory().textNode(Double.toString(values.get(1).asDouble()*2)));
+            values.set(2, json.getNodeFactory().textNode(Double.toString(values.get(2).asDouble()*2)));
+            row.setPayload(payload.toString());
+        }
+        sample.setPayload(rows.get(0).getPayload());
+        var learned = learner.simulate(sample, SOURCE.plusSeconds(7200), config).orElseThrow();
+        assertEquals(8, learned.trainingCount());
+        double x = Double.parseDouble(learned.numbers().get(0));
+        assertTrue(x >= .02 && x <= .03, "在已放大历史范围内生成，不再额外放大一次");
+        assertEquals(x*2, Double.parseDouble(learned.numbers().get(1)), .0000015);
+        var boundary = json.readTree(rows.get(1).getPayload());
+        ((com.fasterxml.jackson.databind.node.ArrayNode) boundary.get(0)).set(1,
+                json.getNodeFactory().textNode("0.015"));
+        rows.get(1).setPayload(boundary.toString());
+        assertTrue(learner.simulate(sample, SOURCE.plusSeconds(7200), config).isEmpty());
     }
 
     private DeviceReportSample history(boolean incline, double[] values) throws Exception {
