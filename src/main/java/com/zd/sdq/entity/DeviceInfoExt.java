@@ -31,4 +31,8 @@ public class DeviceInfoExt extends DeviceInfo {
     // 基线值
     @TableField(value = "baseline")
     private Double baseline;
+
+    // 倾角 X/Y 基准 JSON，按需读取，不加入普通设备查询。
+    @TableField(value = "incline_baseline", select = false)
+    private String inclineBaseline;
 }

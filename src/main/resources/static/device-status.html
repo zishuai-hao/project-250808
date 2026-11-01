@@ -251,6 +251,53 @@
             font-weight: 600;
         }
 
+        dialog {
+            width: min(540px, calc(100vw - 32px));
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 24px;
+            color: var(--text);
+        }
+
+        dialog::backdrop {
+            background: rgb(15 23 42 / 35%);
+        }
+
+        dialog h2 {
+            margin-top: 0;
+            font-size: 20px;
+        }
+
+        dialog label {
+            display: block;
+            margin: 14px 0;
+        }
+
+        dialog input {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            margin-top: 6px;
+        }
+
+        .baseline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .secondary {
+            background: #fff;
+            color: var(--text);
+            border-color: var(--line);
+        }
+
+        .baseline-cell {
+            min-width: 175px;
+            line-height: 1.8;
+        }
+
         @media (max-width: 760px) {
             .shell {
                 width: min(100vw - 20px, 1280px);
@@ -313,6 +360,8 @@
         </div>
     </section>
 
+    <p id="baseline-notice" role="status" class="muted"></p>
+
     <section class="toolbar" aria-label="筛选">
         <input id="keyword" type="search" placeholder="搜索设备编号、监测内容、类型">
         <select id="status-filter" aria-label="状态筛选">
@@ -334,6 +383,7 @@
                 <th>监测内容</th>
                 <th>类型</th>
                 <th>最新数据</th>
+                <th>倾角基准（°）</th>
                 <th>数据时间</th>
                 <th>接收时间</th>
                 <th>接入</th>
@@ -345,9 +395,31 @@
     </section>
 </main>
 
+<dialog id="baseline-dialog" aria-labelledby="baseline-title">
+    <form id="baseline-form">
+        <h2 id="baseline-title">设置倾角基准</h2>
+        <div id="baseline-device" class="device-code"></div>
+        <p class="muted">转发角度 = 原始角度 − 基准值。保存后从下一条采集数据生效，历史记录保持原值。温度不扣减。</p>
+        <label>X 轴基准（°）<input id="baseline-x" type="number" step="any" required></label>
+        <label>Y 轴基准（°）<input id="baseline-y" type="number" step="any" required></label>
+        <button id="baseline-use-current" type="button" class="secondary">使用最新原始值</button>
+        <p id="baseline-sample-time" class="muted"></p>
+        <p id="baseline-error" class="error" role="alert"></p>
+        <div class="baseline-actions">
+            <button id="baseline-save" type="submit">保存基准</button>
+            <button id="baseline-remove" type="button" class="secondary">清除基准</button>
+            <button id="baseline-cancel" type="button" class="secondary">取消</button>
+        </div>
+    </form>
+</dialog>
+
 <script>
     const state = {
         devices: [],
+        baselines: {},
+        baselineDeviceCode: null,
+        baselineBusy: false,
+        baselineRevision: 0,
         loading: false,
     };
 
@@ -393,6 +465,126 @@
             </div>
         `).join("")}</div>`;
     }
+
+    function renderBaseline(device) {
+        if (device.deviceType !== "INC") {
+            return '<span class="muted">—</span>';
+        }
+        const baseline = state.baselines[device.deviceCode];
+        return `<div class="baseline-cell">
+            ${baseline ? `<div>X: ${formatValue(baseline.angleX)}</div>
+                <div>Y: ${formatValue(baseline.angleY)}</div>
+                <div class="muted">${escapeHtml(new Date(baseline.updatedAt).toLocaleString())}</div>`
+                : '<div class="muted">未设置，转发原始角度</div>'}
+            <button type="button" class="secondary" data-baseline-device="${escapeHtml(device.deviceCode)}">
+                ${baseline ? "修改基准" : "设置基准"}
+            </button>
+        </div>`;
+    }
+
+    const baselineFields = {
+        dialog: document.getElementById("baseline-dialog"),
+        form: document.getElementById("baseline-form"),
+        device: document.getElementById("baseline-device"),
+        x: document.getElementById("baseline-x"),
+        y: document.getElementById("baseline-y"),
+        useCurrent: document.getElementById("baseline-use-current"),
+        sampleTime: document.getElementById("baseline-sample-time"),
+        error: document.getElementById("baseline-error"),
+        save: document.getElementById("baseline-save"),
+        remove: document.getElementById("baseline-remove"),
+        cancel: document.getElementById("baseline-cancel"),
+        notice: document.getElementById("baseline-notice"),
+    };
+
+    function currentBaselineDevice() {
+        return state.devices.find(device => device.deviceCode === state.baselineDeviceCode);
+    }
+
+    function hasRawAngles(device) {
+        const data = device?.latestData || {};
+        return typeof data.rawAngleX === "number" && Number.isFinite(data.rawAngleX)
+            && typeof data.rawAngleY === "number" && Number.isFinite(data.rawAngleY);
+    }
+
+    function openBaseline(deviceCode) {
+        state.baselineDeviceCode = deviceCode;
+        const baseline = state.baselines[deviceCode];
+        const device = currentBaselineDevice();
+        baselineFields.device.textContent = deviceCode;
+        baselineFields.x.value = baseline?.angleX ?? "";
+        baselineFields.y.value = baseline?.angleY ?? "";
+        baselineFields.error.textContent = "";
+        baselineFields.sampleTime.textContent = hasRawAngles(device)
+            ? `可选原始数据时间：${device.dataTime}（${device.statusText}）` : "暂无原始数据，可手动填写基准。";
+        baselineFields.useCurrent.disabled = !hasRawAngles(device);
+        baselineFields.remove.disabled = !baseline;
+        baselineFields.dialog.showModal();
+    }
+
+    baselineFields.useCurrent.addEventListener("click", () => {
+        const device = currentBaselineDevice();
+        if (hasRawAngles(device)) {
+            baselineFields.x.value = device.latestData.rawAngleX;
+            baselineFields.y.value = device.latestData.rawAngleY;
+            baselineFields.sampleTime.textContent = `已填写原始数据，时间：${device.dataTime}（${device.statusText}）`;
+        }
+    });
+
+    async function updateBaseline(method) {
+        if (state.baselineBusy) return;
+        const deviceCode = state.baselineDeviceCode;
+        const request = {method};
+        if (method === "PUT") {
+            if (!baselineFields.form.reportValidity()) return;
+            const angleX = Number(baselineFields.x.value);
+            const angleY = Number(baselineFields.y.value);
+            if (!Number.isFinite(angleX) || !Number.isFinite(angleY)) {
+                baselineFields.error.textContent = "X、Y 基准值必须为有效数字";
+                return;
+            }
+            request.headers = {"Content-Type": "application/json"};
+            request.body = JSON.stringify({angleX, angleY});
+        }
+        state.baselineBusy = true;
+        state.baselineRevision++;
+        baselineFields.error.textContent = "";
+        const controls = [...baselineFields.form.querySelectorAll("button, input")];
+        controls.forEach(control => control.disabled = true);
+        try {
+            const response = await fetch(`/api/incline-baselines/${encodeURIComponent(deviceCode)}`, request);
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || error.detail || `HTTP ${response.status}`);
+            }
+            if (method === "PUT") state.baselines[deviceCode] = await response.json();
+            else delete state.baselines[deviceCode];
+            baselineFields.notice.textContent = `${deviceCode} 基准已${method === "PUT" ? "保存" : "清除"}，从下一条采集数据生效。`;
+            baselineFields.dialog.close();
+            renderRows();
+        } catch (error) {
+            baselineFields.error.textContent = error.message;
+        } finally {
+            state.baselineBusy = false;
+            controls.forEach(control => control.disabled = false);
+            baselineFields.useCurrent.disabled = !hasRawAngles(currentBaselineDevice());
+            baselineFields.remove.disabled = !state.baselines[deviceCode];
+        }
+    }
+
+    baselineFields.form.addEventListener("submit", event => {
+        event.preventDefault();
+        updateBaseline("PUT");
+    });
+    baselineFields.remove.addEventListener("click", () => updateBaseline("DELETE"));
+    baselineFields.cancel.addEventListener("click", () => baselineFields.dialog.close());
+    baselineFields.dialog.addEventListener("cancel", event => {
+        if (state.baselineBusy) event.preventDefault();
+    });
+    fields.rows.addEventListener("click", event => {
+        const button = event.target.closest("[data-baseline-device]");
+        if (button) openBaseline(button.dataset.baselineDevice);
+    });
 
     function matchesFilter(device) {
         const keyword = fields.keyword.value.trim().toLowerCase();
@@ -440,6 +632,7 @@
                     <div class="muted">${escapeHtml(device.deviceTypeName || "")}</div>
                 </td>
                 <td>${renderLatestData(device)}</td>
+                <td>${renderBaseline(device)}</td>
                 <td>${formatValue(device.dataTime)}</td>
                 <td>${formatValue(device.receivedAt)}</td>
                 <td>
@@ -457,15 +650,23 @@
     }
 
     async function loadDeviceStatus() {
+        if (state.loading) return;
+        const baselineRevision = state.baselineRevision;
         state.loading = true;
         fields.refreshButton.disabled = true;
         fields.refreshButton.textContent = "刷新中";
         try {
-            const response = await fetch("/api/device-status", {cache: "no-store"});
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+            const responses = await Promise.all([
+                fetch("/api/device-status", {cache: "no-store"}),
+                fetch("/api/incline-baselines", {cache: "no-store"}),
+            ]);
+            for (const response of responses) {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
             }
-            state.devices = await response.json();
+            const [devices, baselines] = await Promise.all(responses.map(response => response.json()));
+            state.devices = devices;
+            // 避免正在保存时，用较早发出的刷新响应覆盖刚保存的基准。
+            if (!state.baselineBusy && baselineRevision === state.baselineRevision) state.baselines = baselines;
             fields.lastRefresh.innerHTML = `刷新时间: ${escapeHtml(new Date().toLocaleString())}`;
         } catch (error) {
             fields.lastRefresh.innerHTML = `<span class="error">刷新失败: ${escapeHtml(error.message)}</span>`;

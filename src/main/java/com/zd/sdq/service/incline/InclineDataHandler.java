@@ -47,6 +47,7 @@ public class InclineDataHandler {
     private final BufferForwardMqttClientAdapter bufferForwardMqttClientAdapter;
     private final DeviceLatestDataCache deviceLatestDataCache;
     private final InclineForwardDataService inclineForwardDataService;
+    private final InclineBaselineService inclineBaselineService;
 
     /**
      * HTTP-Client 网关类型标识
@@ -259,13 +260,15 @@ public class InclineDataHandler {
                 }
                 // 如果是 INC 设备，则发送角度数据和温度数据
                 else if (device.getDeviceType().equals(DeviceType.INC)) {
+                    InclineBaselineService.CorrectedAngles angles = inclineBaselineService.apply(
+                            device.getDeviceCode(), record.getAngleX(), record.getAngleY());
                     MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
                     builder.currentTime();
                     builder.monitoringCode(device.getDeviceCode());
                     builder.addData(
                             zonedDateTime,
-                            NumberUtil.roundStr(record.getAngleX(), 6),
-                            NumberUtil.roundStr(record.getAngleY(), 6),
+                            NumberUtil.roundStr(angles.angleX(), 6),
+                            NumberUtil.roundStr(angles.angleY(), 6),
                             NumberUtil.roundStr(record.getTemp(), 3));
                     MqttData mqttData = builder.build();
 
@@ -273,8 +276,16 @@ public class InclineDataHandler {
                     // 保存成功后再发送数据到缓冲转发适配器
                     bufferForwardMqttClientAdapter.push(device.getDeviceCode(), mqttData.getValue());
                     Map<String, Object> latestData = new LinkedHashMap<>();
-                    latestData.put("angleX", NumberUtil.roundStr(record.getAngleX(), 6));
-                    latestData.put("angleY", NumberUtil.roundStr(record.getAngleY(), 6));
+                    latestData.put("angleX", NumberUtil.roundStr(angles.angleX(), 6));
+                    latestData.put("angleY", NumberUtil.roundStr(angles.angleY(), 6));
+                    latestData.put("rawAngleX", record.getAngleX());
+                    latestData.put("rawAngleY", record.getAngleY());
+                    latestData.put("baselineApplied", angles.baseline() != null);
+                    if (angles.baseline() != null) {
+                        latestData.put("baselineX", angles.baseline().angleX());
+                        latestData.put("baselineY", angles.baseline().angleY());
+                        latestData.put("baselineUpdatedAt", angles.baseline().updatedAt());
+                    }
                     latestData.put("temp", NumberUtil.roundStr(record.getTemp(), 3));
                     latestData.put("angleUnit", "deg");
                     latestData.put("tempUnit", "C");

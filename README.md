@@ -25,3 +25,25 @@ FROM incline_forward_data
 ORDER BY id DESC
 LIMIT 100;
 ```
+
+倾角固定基准：
+
+- 在 `/device-status.html` 的 INC 设备行点击“设置基准”，可手动填写 X/Y 基准，或点击“使用最新原始值”后保存。界面会显示所选原始数据的时间和状态，便于核对后设置。
+- 基准按 INC 设备编号独立保存，单位为度。设置后，后续转发及状态页 `angleX`、`angleY` 使用“原始角度 − 对应轴基准”；未设置或清除基准时使用原始角度。温度、VIB、水位不参与此扣减。
+- 状态页的 `rawAngleX`、`rawAngleY` 保留原始值；发送前快照的 `raw_data` 也保留原始记录，`payload` 留存实际转发的扣减结果。原始记录不会被改写，基准不会随每次采集自动滚动。
+- 基准保存在现有设备表 `s_device_info_ext` 的 `incline_baseline` 字段中，SQLite 使用 `TEXT` 存储 JSON。应用启动时自动补充该字段，不修改原有水位 `baseline` 字段。每次采集读取最新基准，无需重启；修改后从下一条采集数据生效，不重算历史记录。
+- 每台设备的一行保存该设备的基准，字段为 `NULL` 时不扣减。JSON 包含 `angleX`、`angleY` 和 `updatedAt`（UTC 设置时间），例如：
+
+```json
+{
+  "angleX": 1.5,
+  "angleY": -2.56,
+  "updatedAt": "2026-11-01T00:00:00Z"
+}
+```
+
+接口（仅已配置的 INC 设备允许设置或清除）：
+
+- `GET /api/incline-baselines`：查询全部固定基准。
+- `PUT /api/incline-baselines/{deviceCode}`，JSON 请求体 `{"angleX":1.5,"angleY":-2.56}`：创建或替换该设备的基准，两个轴均必填，零值有效。
+- `DELETE /api/incline-baselines/{deviceCode}`：清除该设备基准，后续恢复转发原始角度。
