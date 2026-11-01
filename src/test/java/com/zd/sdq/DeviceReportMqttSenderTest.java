@@ -4,7 +4,6 @@ import com.company.cbf.starter.data.entity.MqttData;
 import com.company.cbf.starter.data.service.forward.ForwardMqttClientService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zd.sdq.entity.MqttClientConfigEntity;
-import com.zd.sdq.entity.dto.SimulatedMqttData;
 import com.zd.sdq.mapper.MqttConfigEntityMapper;
 import com.zd.sdq.service.DeviceReportMqttSender;
 import io.netty.handler.codec.mqtt.MqttQoS;
@@ -64,21 +63,25 @@ class DeviceReportMqttSenderTest {
     }
 
     @Test
-    void serializesSimulationFlagsAndRealSourceTimeWithoutChangingProtocolColumns() throws Exception {
+    void serializesOnlyLegacyFieldsAndPreservesProtocolColumns() throws Exception {
         connected();
-        long sourceTime = sentAt.minusSeconds(2 * 3600).toEpochMilli();
-        var simulated = new SimulatedMqttData("A-VIB", "VIB",
-                List.of(List.of("2026-11-01 10:00:00.000", "0.0060")), sourceTime, "HISTORICAL_AR1");
-        sender.sendOnce(1L, List.of(data("A-INC", "INC"), simulated));
+        var vibration = MqttData.builder().deviceId("A-VIB").deviceType("VIB")
+                .value(List.of(List.of("2026-11-01 10:00:00.000", "0.0060"))).build();
+        sender.sendOnce(1L, List.of(data("A-INC", "INC"), vibration));
         var payload = ArgumentCaptor.forClass(Buffer.class);
         verify(client).publish(eq("test/topic"), payload.capture(), eq(MqttQoS.AT_MOST_ONCE),
                 eq(false), eq(false), any());
-        var items = json.readTree(payload.getValue().toString()).path("mqtt_data");
-        assertFalse(items.get(0).has("simulated")); // 真实条目保持原协议
-        assertTrue(items.get(1).path("simulated").asBoolean());
-        assertEquals(sourceTime, items.get(1).path("source_time").asLong());
-        assertEquals("HISTORICAL_AR1", items.get(1).path("simulation_method").asText());
-        assertEquals(sentAt.toEpochMilli(), items.get(1).path("sample_time").asLong());
+        var body = json.readTree(payload.getValue().toString());
+        java.util.Set<String> outer = new java.util.HashSet<>();
+        body.fieldNames().forEachRemaining(outer::add);
+        assertEquals(java.util.Set.of("data_tag", "mqtt_data"), outer);
+        var items = body.path("mqtt_data");
+        for (var item : items) {
+            java.util.Set<String> fields = new java.util.HashSet<>();
+            item.fieldNames().forEachRemaining(fields::add);
+            assertEquals(java.util.Set.of("sample_time", "device_id", "device_type", "value"), fields);
+            assertEquals(sentAt.toEpochMilli(), item.path("sample_time").asLong());
+        }
         assertEquals(2, items.get(1).path("value").get(0).size());
         assertEquals("0.0060", items.get(1).path("value").get(0).get(1).asText());
     }

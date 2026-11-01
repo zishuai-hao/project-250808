@@ -7,7 +7,6 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zd.sdq.config.DeviceReportConfig;
 import com.zd.sdq.entity.dto.DeviceReportSample;
-import com.zd.sdq.entity.dto.SimulatedMqttData;
 import com.zd.sdq.mapper.InclineForwardDataMapper;
 import com.zd.sdq.mapper.WaterLevelDataMapper;
 import com.zd.sdq.service.incline.HistoricalFluctuationSimulator;
@@ -120,7 +119,6 @@ public class DeviceScheduledReportService implements SchedulingConfigurer {
                         }
                     }
                     row.set(0, alignedTime);
-                    MqttData data;
                     if (simulated) {
                         var learned = simulator.simulate(sample, reportTime, simulation);
                         if (learned.isEmpty()) {
@@ -130,17 +128,16 @@ public class DeviceScheduledReportService implements SchedulingConfigurer {
                         }
                         row.subList(1, row.size()).clear();
                         row.addAll(learned.get().numbers());
-                        data = new SimulatedMqttData(sample.getDeviceCode(), type.name(), values,
-                                sourceTime.toEpochMilli(), HistoricalFluctuationSimulator.METHOD);
                         simulatedCount++;
                         log.warn("生成模拟上报条目，测点: {}，平台时间: {}，真实源时间: {}，源数据年龄: {}，算法: {}，学习条数: {}",
                                 sample.getDeviceCode(), reportTime, sourceTime, Duration.between(sourceTime, reportTime),
                                 HistoricalFluctuationSimulator.METHOD, learned.get().trainingCount());
                     } else {
-                        data = MqttData.builder().deviceId(sample.getDeviceCode())
-                                .deviceType(type.name()).value(values).build();
                         measuredCount++;
                     }
+                    // 实测与历史估算统一沿用原协议，不附加模拟标识或源时间字段。
+                    MqttData data = MqttData.builder().deviceId(sample.getDeviceCode())
+                            .deviceType(type.name()).value(values).build();
                     byGateway.computeIfAbsent(sample.getMqttGatewayId(), key -> new ArrayList<>()).add(data);
                 } catch (Exception e) {
                     log.warn("跳过不可上报的测点: {}，平台时间: {}", sample.getDeviceCode(), reportTime, e);

@@ -10,7 +10,6 @@ import com.zd.sdq.config.DeviceReportConfig;
 import com.zd.sdq.config.InclineFluctuationConfig;
 import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.DeviceInfoExt;
-import com.zd.sdq.entity.dto.SimulatedMqttData;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
 import com.zd.sdq.mapper.InclineForwardDataMapper;
 import com.zd.sdq.mapper.WaterLevelDataMapper;
@@ -123,7 +122,7 @@ class DeviceScheduledReportTest {
         assertEquals("0.3", one.get(0).getValue().get(0).get(1));
         for (MqttData data : java.util.stream.Stream.concat(one.stream(), two.stream()).toList()) {
             assertEquals("2026-11-01 10:00:00.000", data.getValue().get(0).get(0));
-            assertFalse(data instanceof SimulatedMqttData);
+            assertEquals(MqttData.class, data.getClass());
         }
         assertEquals(before, jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id"));
         verifyNoMoreInteractions(sender);
@@ -195,8 +194,8 @@ class DeviceScheduledReportTest {
         List<MqttData> first = values.getAllValues().get(0);
         List<MqttData> second = values.getAllValues().get(1);
         assertEquals(1, first.size());
-        assertFalse(first.get(0) instanceof SimulatedMqttData);
-        assertFalse(second.get(0) instanceof SimulatedMqttData);
+        assertEquals(MqttData.class, first.get(0).getClass());
+        assertEquals(MqttData.class, second.get(0).getClass());
         assertEquals("2026-11-01 10:00:00.000", first.get(0).getValue().get(0).get(0));
         assertEquals("2026-11-01 11:00:00.000", second.get(0).getValue().get(0).get(0));
         reports.reportInclineVibAt(T.plusSeconds(3601));
@@ -225,19 +224,23 @@ class DeviceScheduledReportTest {
         verify(sender).sendOnce(eq(1L), values.capture());
         List<MqttData> data = values.getValue();
         assertEquals(List.of("HOLD-INC", "HOLD-VIB", "REAL-INC"), data.stream().map(MqttData::getDeviceId).toList());
-        var inc = assertInstanceOf(SimulatedMqttData.class, data.get(0));
-        var vib = assertInstanceOf(SimulatedMqttData.class, data.get(1));
-        assertTrue(inc.isSimulated());
-        assertEquals("HISTORICAL_AR1", inc.getSimulationMethod());
-        assertEquals(T.minusSeconds(3601).toEpochMilli(), inc.getSourceTime());
-        assertEquals(T.minusSeconds(4 * 3600).toEpochMilli(), vib.getSourceTime());
+        var inc = data.get(0);
+        assertEquals(MqttData.class, inc.getClass());
+        var vib = data.get(1);
+        assertEquals(MqttData.class, vib.getClass());
+        for (MqttData item : data) {
+            var wire = json.valueToTree(item);
+            assertFalse(wire.has("simulated"));
+            assertFalse(wire.has("source_time"));
+            assertFalse(wire.has("simulation_method"));
+        }
         assertEquals("2026-11-01 10:00:00.000", inc.getValue().get(0).get(0));
         assertEquals("2026-11-01 10:00:00.000", vib.getValue().get(0).get(0));
         assertEquals(4, inc.getValue().get(0).size());
         assertEquals(2, vib.getValue().get(0).size());
         assertTrue(Double.parseDouble(inc.getValue().get(0).get(1)) >= -0.346078);
         assertTrue(Double.parseDouble(inc.getValue().get(0).get(1)) <= -0.345278);
-        assertFalse(data.get(2) instanceof SimulatedMqttData);
+        assertEquals(MqttData.class, data.get(2).getClass());
         assertEquals(before, jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id"));
     }
 
@@ -253,11 +256,8 @@ class DeviceScheduledReportTest {
         verify(sender, times(5)).sendOnce(eq(1L), values.capture());
         for (int hour = 0; hour <= 4; hour++) {
             List<MqttData> data = values.getAllValues().get(hour);
-            assertEquals(hour > 1, data.get(0) instanceof SimulatedMqttData);
+            assertEquals(MqttData.class, data.get(0).getClass());
             if (hour <= 1) assertEquals("0.123456", data.get(0).getValue().get(0).get(1));
-            if (hour > 1) {
-                assertEquals(T.toEpochMilli(), ((SimulatedMqttData) data.get(0)).getSourceTime());
-            }
         }
         assertEquals(6, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data", Integer.class));
         verifyNoMoreInteractions(sender); // 第5小时不发送，模拟不能续期
@@ -266,7 +266,7 @@ class DeviceScheduledReportTest {
         clearInvocations(sender);
         reports.reportInclineVibAt(T.plusSeconds(5 * 3600));
         verify(sender).sendOnce(eq(1L), argThat(data -> data.size() == 1
-                && !(data.get(0) instanceof SimulatedMqttData)
+                && data.get(0).getClass() == MqttData.class
                 && "0.234567".equals(data.get(0).getValue().get(0).get(1))));
     }
 
