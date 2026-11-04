@@ -298,7 +298,57 @@
             line-height: 1.8;
         }
 
+        .device-link {
+            height: auto;
+            padding: 0;
+            border: 0;
+            background: none;
+            color: #0f766e;
+            text-align: left;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        #history-dialog {
+            width: min(1000px, calc(100vw - 24px));
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto;
+        }
+
+        .history-heading, .history-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .history-heading {
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .history-heading h2 { margin-bottom: 8px; }
+        #history-device { overflow-wrap: anywhere; }
+        #history-close { width: auto; }
+        .history-controls { margin-top: 12px; }
+        .history-controls label { margin: 0; }
+        .history-ranges { display: flex; flex-wrap: wrap; gap: 8px; }
+        .history-ranges button { width: auto; font-weight: 400; }
+        .history-ranges button[aria-pressed="true"] { background: #0f766e; border-color: #0f766e; color: #fff; }
+        #history-custom:not([hidden]) { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+        #history-custom label { margin: 0; }
+        #history-custom input { width: 225px; max-width: 100%; }
+        #history-apply { width: auto; }
+        #history-range-error { margin-bottom: 0; }
+        #history-refresh { width: auto; }
+        #history-status { min-height: 20px; }
+        #history-plot { width: 100%; height: 420px; }
+        #history-plot:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+        #history-tooltip { min-height: 42px; line-height: 1.6; overflow-wrap: anywhere; }
+
         @media (max-width: 760px) {
+            #history-dialog { padding: 16px; }
+            #history-plot { height: 360px; }
             .shell {
                 width: min(100vw - 20px, 1280px);
             }
@@ -374,6 +424,7 @@
         <button id="refresh-button" type="button">刷新</button>
     </section>
 
+    <p class="muted">点击设备编号查看观测曲线。</p>
     <section class="table-wrap" aria-label="设备列表">
         <table>
             <thead>
@@ -411,6 +462,42 @@
             <button id="baseline-cancel" type="button" class="secondary">取消</button>
         </div>
     </form>
+</dialog>
+
+<dialog id="history-dialog" aria-labelledby="history-title">
+    <div class="history-heading">
+        <div>
+            <h2 id="history-title">观测曲线</h2>
+            <div id="history-device"></div>
+        </div>
+        <button id="history-close" type="button" class="secondary" autofocus>关闭</button>
+    </div>
+    <div class="history-controls">
+        <span id="history-range-label">时间范围</span>
+        <div id="history-ranges" class="history-ranges" role="group" aria-labelledby="history-range-label">
+            <button type="button" class="secondary" data-hours="1" aria-pressed="false">近 1 小时</button>
+            <button type="button" class="secondary" data-hours="6" aria-pressed="false">近 6 小时</button>
+            <button type="button" class="secondary" data-hours="24" aria-pressed="true">近 24 小时</button>
+            <button type="button" class="secondary" data-hours="48" aria-pressed="false">近 48 小时</button>
+            <button type="button" class="secondary" data-hours="168" aria-pressed="false">近 7 天</button>
+            <button type="button" class="secondary" data-hours="custom" aria-pressed="false">自定义</button>
+        </div>
+        <button id="history-refresh" type="button">刷新曲线</button>
+    </div>
+    <form id="history-custom" hidden>
+        <label>开始时间（北京时间）<input id="history-start" type="datetime-local" required></label>
+        <label>结束时间（北京时间）<input id="history-end" type="datetime-local" required></label>
+        <button id="history-apply" type="submit">查询</button>
+        <span class="muted">单次最多查询 45 天</span>
+    </form>
+    <p id="history-range-error" class="error" role="alert" hidden></p>
+    <p id="history-status" class="muted" role="status" aria-live="polite"></p>
+    <div id="history-chart" hidden>
+        <p class="muted">点击图例开关曲线；拖动底部滑块或在图中滚轮缩放。聚焦图表后可用左右方向键查看数值。</p>
+        <div id="history-plot" tabindex="0" aria-label="设备历史观测曲线，使用左右方向键查看采集点"></div>
+        <div id="history-tooltip" class="muted" aria-live="polite"></div>
+    </div>
+    <p class="muted">时间为北京时间。曲线展示真实采集入库值；倾角使用采集时处理后的值，水位差值为基准减原始水位。INC/VIB 最多保留 45 天，水位保留 48 小时。</p>
 </dialog>
 
 <script>
@@ -626,7 +713,10 @@
                     <div class="muted">${escapeHtml(device.message || "")}</div>
                 </td>
                 <td>
-                    <div class="device-code">${escapeHtml(device.deviceCode || "-")}</div>
+                    ${["INC", "VIB", "WLV"].includes(device.deviceType)
+                        ? `<button type="button" class="device-code device-link" data-history-device="${escapeHtml(device.deviceCode)}"
+                            aria-label="查看 ${escapeHtml(device.deviceCode)} 的观测曲线">${escapeHtml(device.deviceCode)}</button>`
+                        : `<div class="device-code">${escapeHtml(device.deviceCode || "-")}</div>`}
                     <div class="muted">${escapeHtml(device.remoteDeviceId || "")}</div>
                 </td>
                 <td>${formatValue(device.monitoringContent)}</td>
@@ -688,5 +778,7 @@
     loadDeviceStatus();
     window.setInterval(loadDeviceStatus, 10000);
 </script>
+<script src="/vendor/echarts/echarts-6.1.0.min.js"></script>
+<script src="/device-history.js"></script>
 </body>
 </html>

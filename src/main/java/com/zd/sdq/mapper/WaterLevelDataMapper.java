@@ -18,6 +18,20 @@ import java.util.List;
  */
 @Mapper
 public interface WaterLevelDataMapper extends BaseMapper<WaterLevelData> {
+    @Select("""
+            SELECT s.* FROM water_level_data s
+            WHERE s.device_code = #{deviceCode} AND s.data_time >= #{fromTime} AND s.data_time <= #{toTime}
+                AND NOT EXISTS (
+                    SELECT 1 FROM water_level_data newer
+                    WHERE newer.device_code = s.device_code AND newer.data_time = s.data_time AND newer.id > s.id
+                )
+            ORDER BY s.data_time DESC, s.id DESC LIMIT #{limit}
+            """)
+    List<WaterLevelData> selectObservationHistory(@Param("deviceCode") String deviceCode,
+                                                 @Param("fromTime") String fromTime,
+                                                 @Param("toTime") String toTime,
+                                                 @Param("limit") int limit);
+
     // 老记录没有原始水位快照，不能使用当前基准倒推，因此不参与上报。
     @Select("""
             SELECT s.device_code, d.device_type, d.mqtt_gateway_id, s.data_time, s.payload
