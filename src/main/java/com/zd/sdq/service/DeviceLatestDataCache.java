@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -47,6 +48,10 @@ public class DeviceLatestDataCache {
         }
 
         latestDataMap.compute(deviceInfo.getDeviceCode(), (deviceCode, current) -> {
+            // 补录旧数据不会把状态页的最新采集时间及在线状态倒退或续期。
+            if (current != null && current.getDataTime() != null && dataTime != null
+                    && Objects.equals(current.getRemoteDeviceId(), deviceInfo.getRemoteDeviceId())
+                    && dataTime.compareTo(current.getDataTime()) <= 0) return current;
             DeviceLatestDataDTO snapshot = current == null ? new DeviceLatestDataDTO() : copyOf(current);
             applyDeviceInfo(snapshot, deviceInfo);
             snapshot.setSource(source);

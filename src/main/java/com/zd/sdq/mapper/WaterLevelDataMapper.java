@@ -34,11 +34,11 @@ public interface WaterLevelDataMapper extends BaseMapper<WaterLevelData> {
 
     // 老记录没有原始水位快照，不能使用当前基准倒推，因此不参与上报。
     @Select("""
-            SELECT s.device_code, d.device_type, d.mqtt_gateway_id, s.data_time, s.payload
+            SELECT s.id, s.device_code, d.device_type, d.mqtt_gateway_id, s.data_time, s.payload
             FROM water_level_data s
             JOIN s_device_info_ext d ON d.device_code = s.device_code
             WHERE d.enable = 1 AND d.device_type = 'WLV' AND s.payload IS NOT NULL
-                AND s.data_time >= #{fromTime} AND s.data_time <= #{toTime}
+                AND s.data_time > #{fromTime} AND s.data_time <= #{toTime}
                 AND NOT EXISTS (
                     SELECT 1 FROM water_level_data newer
                     WHERE newer.device_code = s.device_code AND newer.payload IS NOT NULL

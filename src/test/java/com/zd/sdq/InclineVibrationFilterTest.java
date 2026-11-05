@@ -138,8 +138,9 @@ class InclineVibrationFilterTest {
         assertTrue(vibrationData.getValue().getValue().get(0).contains("0.2245"));
         assertTrue(inclineData.getValue().getValue().get(0).contains("0.123457"));
 
+        clearInvocations(archive);
         process(List.of(vibration, incline), record);
-        verifyNoMoreInteractions(archive);
+        verifyNoInteractions(archive);
     }
 
     @Test

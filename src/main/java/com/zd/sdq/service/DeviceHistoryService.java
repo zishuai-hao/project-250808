@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zd.sdq.entity.DeviceInfoExt;
+import com.zd.sdq.entity.DeviceReportState;
 import com.zd.sdq.entity.dto.DeviceHistoryDTO;
 import com.zd.sdq.entity.dto.DeviceHistoryDTO.Point;
 import com.zd.sdq.entity.dto.DeviceHistoryDTO.Series;
@@ -71,18 +72,23 @@ public class DeviceHistoryService {
                 List<Double> values = values(row.getPayload(), series.size());
                 // 旧记录只留存差值，不能用当前基准倒推原始水位。
                 if (row.getPayload() == null) values.set(0, finite(row.getWaterLevel()));
-                points.add(new Point(timestamp(row.getDataTime()), values));
+                points.add(new Point(timestamp(row.getDataTime()), values, delivery(row)));
             }
         } else {
-            for (var row : inclineMapper.selectSimulationHistory(deviceCode, device.getRemoteDeviceId(), type,
+            for (var row : inclineMapper.selectObservationHistory(deviceCode, device.getRemoteDeviceId(), type,
                     fromTime, toTime, MAX_POINTS + 1)) {
-                points.add(new Point(timestamp(row.getDataTime()), values(row.getPayload(), series.size())));
+                points.add(new Point(timestamp(row.getDataTime()), values(row.getPayload(), series.size()), delivery(row)));
             }
         }
         boolean truncated = points.size() > MAX_POINTS;
         if (truncated) points.remove(points.size() - 1);
         Collections.reverse(points);
         return new DeviceHistoryDTO(deviceCode, type, from.toEpochMilli(), to.toEpochMilli(), series, points, truncated);
+    }
+
+    private DeviceHistoryDTO.Delivery delivery(DeviceReportState row) {
+        return new DeviceHistoryDTO.Delivery(row.getReportStatus(), row.getReportTime(), row.getReportAttempts(),
+                row.getReportSentAt(), row.getReportError());
     }
 
     private List<Double> values(String payload, int size) {

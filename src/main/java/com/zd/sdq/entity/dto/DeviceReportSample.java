@@ -5,6 +5,7 @@ import lombok.Data;
 /** 从现有留存表选出的测点最新有效数据。 */
 @Data
 public class DeviceReportSample {
+    private Long id;
     private String deviceCode;
     private String deviceType;
     private String remoteDeviceId;

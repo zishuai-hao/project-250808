@@ -9,7 +9,7 @@ import com.zd.sdq.config.DeviceReportConfig;
 import com.zd.sdq.entity.dto.DeviceReportSample;
 import com.zd.sdq.mapper.InclineForwardDataMapper;
 import com.zd.sdq.mapper.WaterLevelDataMapper;
-import com.zd.sdq.service.incline.HistoricalFluctuationSimulator;
+import com.zd.sdq.service.DeviceReportStateStore.Source;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
@@ -18,14 +18,14 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -34,7 +34,6 @@ import java.util.function.Consumer;
 @Service
 @RequiredArgsConstructor
 public class DeviceScheduledReportService implements SchedulingConfigurer {
-    // 现有两张表的无时区采集时间均使用北京时间，不随报文时区配置变化。
     private static final DateTimeFormatter SOURCE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.of("Asia/Shanghai"));
     private static final TypeReference<List<List<String>>> VALUES_TYPE = new TypeReference<>() { };
@@ -43,20 +42,22 @@ public class DeviceScheduledReportService implements SchedulingConfigurer {
     private final WaterLevelDataMapper waterMapper;
     private final ObjectMapper objectMapper;
     private final DeviceReportMqttSender sender;
-    private final HistoricalFluctuationSimulator simulator;
+    private final DeviceReportStateStore stateStore;
+
+    private record Delivery(DeviceReportSample sample, String token, MqttData data) { }
 
     @Override
     public void configureTasks(ScheduledTaskRegistrar registrar) {
-        register(registrar, config.getInclineVib(), this::reportInclineVibAt);
-        register(registrar, config.getWaterLevel(), this::reportWaterLevelAt);
+        register(registrar, config.getInclineVib().getCron(), this::reportInclineVibAt);
+        register(registrar, config.getWaterLevel().getCron(), this::reportWaterLevelAt);
+        register(registrar, config.getRetryCron(), this::retryAt);
     }
 
-    private void register(ScheduledTaskRegistrar registrar, DeviceReportConfig.Group group,
-                          Consumer<Instant> task) {
-        if ("-".equals(group.getCron())) return;
-        CronTrigger trigger = new CronTrigger(group.getCron(), ZoneId.of(config.getZone()));
+    private void register(ScheduledTaskRegistrar registrar, String cron, Consumer<Instant> task) {
+        if ("-".equals(cron)) return;
+        CronTrigger trigger = new CronTrigger(cron, ZoneId.of(config.getZone()));
         AtomicReference<Instant> scheduledAt = new AtomicReference<>();
-        // 使用调度器计划的刻度，而非任务真正开始执行的秒数。CronTrigger 默认跳过错过的刻度，不补发。
+        // 保存计划刻度，任务晚执行时仍使用原窗口。错过的历史刻度由补发扫描恢复。
         registrar.addTriggerTask(() -> task.accept(scheduledAt.get()), context -> {
             Instant next = trigger.nextExecution(context);
             scheduledAt.set(next);
@@ -65,95 +66,94 @@ public class DeviceScheduledReportService implements SchedulingConfigurer {
     }
 
     public void reportInclineVibAt(Instant reportTime) {
-        reportAt(reportTime, config.getInclineVib(), config.getInclineVib().getSimulation(),
-                inclineMapper::selectLatestForReport);
+        if (!"-".equals(config.getInclineVib().getCron())) {
+            reportAt(reportTime.minusSeconds(3600), reportTime, Source.INCLINE, inclineMapper::selectLatestForReport);
+        }
     }
 
     public void reportWaterLevelAt(Instant reportTime) {
-        reportAt(reportTime, config.getWaterLevel(), null, waterMapper::selectLatestForReport);
+        if (!"-".equals(config.getWaterLevel().getCron())) {
+            reportAt(reportTime.minusSeconds(3600), reportTime, Source.WATER, waterMapper::selectLatestForReport);
+        }
     }
 
-    private void reportAt(Instant reportTime, DeviceReportConfig.Group group,
-                           DeviceReportConfig.Simulation simulation,
-                           BiFunction<String, String, List<DeviceReportSample>> query) {
+    /** 只扫描已结束的小时；最近24小时之外的数据保留状态，但不再自动补发。 */
+    public void retryAt(Instant now) {
+        Instant cutoff = now.minusSeconds(24 * 3600);
+        Instant end = now.atZone(ZoneId.of(config.getZone())).truncatedTo(ChronoUnit.HOURS).toInstant();
+        for (Instant hour = end.minusSeconds(23 * 3600); !hour.isAfter(end); hour = hour.plusSeconds(3600)) {
+            Instant from = hour.minusSeconds(3600);
+            if (from.isBefore(cutoff)) from = cutoff;
+            if (!"-".equals(config.getInclineVib().getCron())) {
+                reportAt(from, hour, Source.INCLINE, inclineMapper::selectLatestForReport);
+            }
+            if (!"-".equals(config.getWaterLevel().getCron())) {
+                reportAt(from, hour, Source.WATER, waterMapper::selectLatestForReport);
+            }
+        }
+    }
+
+    private void reportAt(Instant from, Instant reportTime, Source source,
+                          BiFunction<String, String, List<DeviceReportSample>> query) {
         try {
-            boolean allowSimulation = simulation != null && simulation.isEnabled();
-            Duration lookupAge = allowSimulation ? simulation.getMaxSourceAge() : group.getMaxAge();
-            Instant oldestSource = reportTime.minus(lookupAge);
-            Instant oldestMeasured = reportTime.minus(group.getMaxAge());
-            String from = SOURCE_TIME.format(oldestSource);
-            String to = SOURCE_TIME.format(reportTime);
-            // 每组用一条SQL取数，保证选择来自同一个数据库读取快照。
-            List<DeviceReportSample> samples = query.apply(from, to);
-            Map<Long, List<MqttData>> byGateway = new LinkedHashMap<>();
-            String alignedTime = reportTime.atZone(ZoneId.of(config.getZone()))
-                    .format(MqttDataBuilder.TIME_FORMATTER);
-            int measuredCount = 0;
-            int simulatedCount = 0;
+            List<DeviceReportSample> samples = query.apply(SOURCE_TIME.format(from), SOURCE_TIME.format(reportTime));
+            Map<Long, List<DeviceReportSample>> byGateway = new LinkedHashMap<>();
             for (DeviceReportSample sample : samples) {
+                byGateway.computeIfAbsent(sample.getMqttGatewayId(), key -> new ArrayList<>()).add(sample);
+            }
+            for (var entry : byGateway.entrySet()) {
+                // 临发送该网关时才抢占，避免等待其他慢网关期间租约过期。
+                List<Delivery> deliveries = new ArrayList<>();
+                for (DeviceReportSample sample : entry.getValue()) {
+                    String token = stateStore.claim(source, sample.getId(), SOURCE_TIME.format(reportTime), System.currentTimeMillis());
+                    if (token == null) continue;
+                    try {
+                        deliveries.add(new Delivery(sample, token, build(sample, reportTime)));
+                    } catch (Exception e) {
+                        stateStore.complete(source, sample.getId(), token, e.toString(), System.currentTimeMillis());
+                        log.warn("不可上报的采集记录: {} / {}", sample.getDeviceCode(), sample.getId(), e);
+                    }
+                }
+                if (deliveries.isEmpty()) continue;
+                String error = null;
                 try {
-                    if (sample.getMqttGatewayId() == null) {
-                        throw new IllegalArgumentException("未配置MQTT网关");
-                    }
-                    Instant sourceTime = LocalDateTime.parse(sample.getDataTime(), SOURCE_TIME)
-                            .atZone(ZoneId.of("Asia/Shanghai")).toInstant();
-                    if (sourceTime.isBefore(oldestSource) || sourceTime.isAfter(reportTime)) continue;
-                    boolean simulated = sourceTime.isBefore(oldestMeasured);
-                    // 反序列化得到独立副本；只修改报文时间，不回写采集快照。
-                    List<List<String>> values = objectMapper.readValue(sample.getPayload(), VALUES_TYPE);
-                    DeviceType type = DeviceType.valueOf(sample.getDeviceType());
-                    int columns = switch (type) {
-                        case INC -> 4;
-                        case VIB -> 2;
-                        case WLV -> 3;
-                        default -> throw new IllegalArgumentException("不支持的设备类型");
-                    };
-                    if (values == null || values.size() != 1 || values.get(0) == null
-                            || values.get(0).size() != columns) {
-                        throw new IllegalArgumentException("采集快照的列数不正确");
-                    }
-                    List<String> row = values.get(0);
-                    for (String value : row.subList(1, row.size())) {
-                        if (value == null || !Double.isFinite(Double.parseDouble(value))) {
-                            throw new IllegalArgumentException("采集快照含无效数值");
-                        }
-                    }
-                    row.set(0, alignedTime);
-                    if (simulated) {
-                        var learned = simulator.simulate(sample, reportTime, simulation);
-                        if (learned.isEmpty()) {
-                            log.warn("历史不足、平坦或不适合学习，跳过模拟测点: {}，真实源时间: {}",
-                                    sample.getDeviceCode(), sourceTime);
-                            continue;
-                        }
-                        row.subList(1, row.size()).clear();
-                        row.addAll(learned.get().numbers());
-                        simulatedCount++;
-                        log.warn("生成模拟上报条目，测点: {}，平台时间: {}，真实源时间: {}，源数据年龄: {}，算法: {}，学习条数: {}",
-                                sample.getDeviceCode(), reportTime, sourceTime, Duration.between(sourceTime, reportTime),
-                                HistoricalFluctuationSimulator.METHOD, learned.get().trainingCount());
-                    } else {
-                        measuredCount++;
-                    }
-                    // 实测与历史估算统一沿用原协议，不附加模拟标识或源时间字段。
-                    MqttData data = MqttData.builder().deviceId(sample.getDeviceCode())
-                            .deviceType(type.name()).value(values).build();
-                    byGateway.computeIfAbsent(sample.getMqttGatewayId(), key -> new ArrayList<>()).add(data);
+                    // 在调度线程等待异步提交，不能在 Vert.x Event Loop 中访问数据库。
+                    sender.sendOnce(entry.getKey(), deliveries.stream().map(Delivery::data).toList())
+                            .get(30, TimeUnit.SECONDS);
                 } catch (Exception e) {
-                    log.warn("跳过不可上报的测点: {}，平台时间: {}", sample.getDeviceCode(), reportTime, e);
+                    if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+                    error = e.toString();
+                    log.error("网关上报失败，等待补发，网关: {}，所属整点: {}", entry.getKey(), reportTime, e);
+                }
+                for (Delivery item : deliveries) {
+                    stateStore.complete(source, item.sample().getId(), item.token(), error, System.currentTimeMillis());
                 }
             }
-            byGateway.forEach((gateway, data) -> {
-                try {
-                    sender.sendOnce(gateway, data);
-                } catch (Exception e) {
-                    log.error("本次网关上报失败，不重试，网关: {}，平台时间: {}", gateway, reportTime, e);
-                }
-            });
-            log.info("定时上报取数完成，平台时间: {}，真实有效期: {}，源数据窗口: {}，实测条目: {}，模拟条目: {}，网关数: {}",
-                    reportTime, group.getMaxAge(), lookupAge, measuredCount, simulatedCount, byGateway.size());
         } catch (Exception e) {
-            log.error("本次定时上报取数失败，不重试，平台时间: {}", reportTime, e);
+            log.error("定时上报失败，待下轮扫描恢复，来源: {}，所属整点: {}", source, reportTime, e);
         }
+    }
+
+    private MqttData build(DeviceReportSample sample, Instant reportTime) throws Exception {
+        if (sample.getMqttGatewayId() == null) throw new IllegalArgumentException("未配置MQTT网关");
+        List<List<String>> values = objectMapper.readValue(sample.getPayload(), VALUES_TYPE);
+        DeviceType type = DeviceType.valueOf(sample.getDeviceType());
+        int columns = switch (type) {
+            case INC -> 4;
+            case VIB -> 2;
+            case WLV -> 3;
+            default -> throw new IllegalArgumentException("不支持的设备类型");
+        };
+        if (values == null || values.size() != 1 || values.get(0) == null || values.get(0).size() != columns) {
+            throw new IllegalArgumentException("采集快照的列数不正确");
+        }
+        List<String> row = values.get(0);
+        for (String value : row.subList(1, row.size())) {
+            if (value == null || !Double.isFinite(Double.parseDouble(value))) {
+                throw new IllegalArgumentException("采集快照含无效数值");
+            }
+        }
+        row.set(0, reportTime.atZone(ZoneId.of(config.getZone())).format(MqttDataBuilder.TIME_FORMATTER));
+        return MqttData.builder().deviceId(sample.getDeviceCode()).deviceType(type.name()).value(values).build();
     }
 }

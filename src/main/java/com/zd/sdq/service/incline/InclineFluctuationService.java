@@ -55,12 +55,6 @@ public class InclineFluctuationService {
         }
     }
 
-    /** k*raw-payload在同一累加段内保持不变，只供历史窗口校验，不再次放大入库值。 */
-    public Angles historyReference(double rawX, double rawY) {
-        BigDecimal factor = number(config.isEnabled() ? config.getFactor() : 1);
-        return finite(number(rawX).multiply(factor), number(rawY).multiply(factor));
-    }
-
     private BigDecimal decimal(JsonNode value) {
         if (value == null || value.isNull()) throw new IllegalArgumentException("缺少上一条入库角度");
         BigDecimal result = new BigDecimal(value.asText());

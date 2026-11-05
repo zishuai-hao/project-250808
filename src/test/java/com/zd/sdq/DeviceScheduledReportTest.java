@@ -7,38 +7,35 @@ import com.company.cbf.starter.data.service.forward.MqttDataBuilder;
 import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zd.sdq.config.DeviceReportConfig;
-import com.zd.sdq.config.InclineFluctuationConfig;
-import com.zd.sdq.service.incline.InclineFluctuationService;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
 import com.zd.sdq.mapper.InclineForwardDataMapper;
 import com.zd.sdq.mapper.WaterLevelDataMapper;
-import com.zd.sdq.service.DeviceLatestDataCache;
 import com.zd.sdq.service.DeviceReportMqttSender;
 import com.zd.sdq.service.DeviceScheduledReportService;
-import com.zd.sdq.service.SingleDeviceRadarWaterLevelServer;
 import com.zd.sdq.service.WaterLevelDataService;
 import com.zd.sdq.service.incline.InclineForwardDataService;
-import com.zd.sdq.service.incline.HistoricalFluctuationSimulator;
+import com.zd.sdq.service.DeviceReportStateStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.support.SimpleTriggerContext;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -79,322 +76,280 @@ class DeviceScheduledReportTest {
         waterStore = new WaterLevelDataService(waterMapper, json, source);
         waterStore.initTable();
         reports = new DeviceScheduledReportService(config, inclineMapper, waterMapper, json, sender,
-                new HistoricalFluctuationSimulator(inclineMapper, json,
-                        new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper())));
+                new DeviceReportStateStore(source));
+        when(sender.sendOnce(anyLong(), anyList())).thenReturn(CompletableFuture.completedFuture(null));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void alignsBothChannelsAcrossDevicesAndGatewaysWithoutChangingSourceSnapshots() throws Exception {
-        device("A-INC", "INC", 1, 1);
-        device("A-VIB", "VIB", 1, 1);
-        device("B-INC", "INC", 2, 1);
-        device("D-INC", "INC", 1, 0);
-        device("EXPIRED", "INC", 1, 1);
-        device("EMPTY", "INC", 1, 1);
-        device("AT-T", "VIB", 1, 1);
-        device("CHANGED-SN", "INC", 1, 1);
-        sample("A-INC", "INC", "2026-11-01 09:50:00", "0.1");
-        sample("A-INC", "INC", "2026-11-01 09:58:00", "0.2");
-        // 相同采集时间保留最后一次入库值；未来数据不挤掉T之前的最新值。
-        sample("A-INC", "INC", "2026-11-01 09:58:00", "0.3");
-        sample("A-INC", "INC", "2026-11-01 10:00:01", "99");
-        sample("A-VIB", "VIB", "2026-11-01 09:59:00", "0.006");
-        sample("B-INC", "INC", "2026-11-01 09:00:00", "0.4"); // 恰好1小时，仍为实测
-        sample("EXPIRED", "INC", "2026-11-01 05:59:59", "55");
-        sample("D-INC", "INC", "2026-11-01 09:59:00", "66");
-        sample("AT-T", "VIB", "2026-11-01 10:00:00", "0.007");
-        sample("CHANGED-SN", "INC", "2026-11-01 09:59:00", "77");
-        jdbc.update("UPDATE s_device_info_ext SET remote_device_id = 'replacement' WHERE device_code = 'CHANGED-SN'");
-        var before = jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id");
-        verifyNoInteractions(sender); // 落库本身不发送
+    void selectsLatestRealPerDeviceWithExclusiveStartAndInclusiveEnd() {
+        for (String code : List.of("A", "BOUNDARY", "OLD", "AT-T", "FUTURE", "WRONG-SN")) device(code, "INC", 1, 1);
+        device("DISABLED", "INC", 1, 0);
+        device("V", "VIB", 2, 1);
+        sample("A", "INC", "2026-11-01 09:01:00", "0.1");
+        sample("A", "INC", "2026-11-01 09:59:00", "0.2");
+        sample("A", "INC", "2026-11-01 10:00:01", "99");
+        sample("BOUNDARY", "INC", "2026-11-01 09:00:00", "9");
+        sample("OLD", "INC", "2026-11-01 08:00:00", "9");
+        sample("AT-T", "INC", "2026-11-01 10:00:00", "0.3");
+        sample("FUTURE", "INC", "2026-11-01 10:00:01", "9");
+        sample("WRONG-SN", "INC", "2026-11-01 09:59:00", "9");
+        sample("DISABLED", "INC", "2026-11-01 09:59:00", "9");
+        sample("V", "VIB", "2026-11-01 09:59:00", "0.006");
+        jdbc.update("UPDATE s_device_info_ext SET remote_device_id = 'OTHER' WHERE device_code = 'WRONG-SN'");
+        var before = jdbc.queryForList("SELECT payload, data_time, sample_time FROM incline_forward_data ORDER BY id");
 
         reports.reportInclineVibAt(T);
-
-        var gatewayOne = ArgumentCaptor.forClass(List.class);
-        var gatewayTwo = ArgumentCaptor.forClass(List.class);
-        verify(sender).sendOnce(eq(1L), gatewayOne.capture());
-        verify(sender).sendOnce(eq(2L), gatewayTwo.capture());
-        List<MqttData> one = gatewayOne.getValue();
-        List<MqttData> two = gatewayTwo.getValue();
-        assertEquals(List.of("A-INC", "A-VIB", "AT-T"), one.stream().map(MqttData::getDeviceId).toList());
-        assertEquals(List.of("B-INC"), two.stream().map(MqttData::getDeviceId).toList());
-        assertEquals("0.3", one.get(0).getValue().get(0).get(1));
-        for (MqttData data : java.util.stream.Stream.concat(one.stream(), two.stream()).toList()) {
-            assertEquals("2026-11-01 10:00:00.000", data.getValue().get(0).get(0));
-            assertEquals(MqttData.class, data.getClass());
-        }
-        assertEquals(before, jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id"));
-        verifyNoMoreInteractions(sender);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void waterStoresOriginalAndDifferenceAtCollectionAndUsesItsOwnWindow() {
-        device("W-1", "WLV", 1, 1);
-        device("W-2", "WLV", 1, 1);
-        device("W-OLD", "WLV", 1, 1);
-        device("W-LEGACY", "WLV", 1, 1);
-        DeviceInfoExt device = new DeviceInfoExt();
-        device.setDeviceCode("W-1");
-        device.setPort("41000");
-        device.setFrequency("60");
-        device.setBaseline(10.0);
-        DeviceLatestDataCache cache = new DeviceLatestDataCache();
-        var server = new SingleDeviceRadarWaterLevelServer(device, null, null, waterStore, cache);
-        ReflectionTestUtils.invokeMethod(server, "saveWaterLevelData", 3.25, T.minusSeconds(75 * 60).atZone(ZONE));
-        device.setBaseline(20.0); // 修改基准不重算已采集快照
-        waterStore.saveCollectedData("W-2", 1.2, 8.8, T.atZone(ZONE));
-        waterStore.saveCollectedData("W-OLD", 1, 9, T.minusSeconds(75 * 60 + 1).atZone(ZONE));
-        jdbc.update("INSERT INTO water_level_data (device_code, water_level, data_time) VALUES ('W-LEGACY', 1, '2026-11-01 09:59:00')");
-        verifyNoInteractions(sender);
-        assertEquals("2026-11-01 08:45:00", cache.getLatestData("W-1").getDataTime());
-
-        reports.reportWaterLevelAt(T);
 
         var values = ArgumentCaptor.forClass(List.class);
         verify(sender).sendOnce(eq(1L), values.capture());
         List<MqttData> data = values.getValue();
-        assertEquals(List.of("W-1", "W-2"), data.stream().map(MqttData::getDeviceId).toList());
-        assertEquals(List.of("2026-11-01 10:00:00.000", "6.7500", "3.2500"), data.get(0).getValue().get(0));
-        assertEquals("2026-11-01 10:00:00.000", data.get(1).getValue().get(0).get(0));
+        assertEquals(List.of("A", "AT-T"), data.stream().map(MqttData::getDeviceId).toList());
+        assertEquals("0.2", data.get(0).getValue().get(0).get(1));
+        assertEquals("2026-11-01 10:00:00.000", data.get(0).getValue().get(0).get(0));
+        verify(sender).sendOnce(eq(2L), anyList());
+        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data WHERE report_status='SENT'", Integer.class));
+        assertEquals(before, jdbc.queryForList("SELECT payload, data_time, sample_time FROM incline_forward_data ORDER BY id"));
     }
 
     @Test
-    void failureDoesNotRetryOrStopOtherGatewaysAndNextTickUsesFreshQuery() {
+    void sameRecordNeverAppearsInTheNextHourAndSentRecordsSurviveRestart() {
+        device("A", "INC", 1, 1);
+        sample("A", "INC", "2026-11-01 10:00:00", "0.1");
+        reports.reportInclineVibAt(T);
+        reports.reportInclineVibAt(T.plusSeconds(3600));
+        inclineStore.initTable(); // 重启初始化不能重置发送状态
+        reports.retryAt(T.plusSeconds(3600));
+        verify(sender, times(1)).sendOnce(anyLong(), anyList());
+        assertEquals("SENT", state("A").get("report_status"));
+        assertEquals(1, state("A").get("report_attempts"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"INC", "VIB", "WLV"})
+    void fiveSamplesSendOnlyNewestAndNeverFallBackToTheFourOlderRows(String type) {
+        device("A", type, 1, 1);
+        for (int minute : List.of(10, 20, 30, 40, 50)) reportSample(type, minute);
+        reports.retryAt(T);
+        // 更早的记录即使仍未发送或曾经失败，也不应被轮流补发。
+        jdbc.update("UPDATE " + table(type) + " SET report_status='FAILED' WHERE data_time < '2026-11-01 09:50:00'");
+        for (int minute : List.of(5, 10, 15, 60)) reports.retryAt(T.plusSeconds(minute * 60L));
+        verify(sender, times(1)).sendOnce(eq(1L), argThat(data -> data.size() == 1
+                && Double.parseDouble(data.get(0).getValue().get(0).get(1)) == 50));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM " + table(type) + " WHERE report_status='SENT'", Integer.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"INC", "VIB", "WLV"})
+    void staleQueryCandidateCannotBeClaimedAfterANewerSampleArrivesOrSucceeds(String type) {
+        device("A", type, 1, 1);
+        long staleId = reportSample(type, 10); // 模拟任务A已经查出的候选。
+        reportSample(type, 50); // A暂停期间，迟到的新记录入库。
+        var store = new DeviceReportStateStore(jdbc.getDataSource());
+        assertNull(store.claim(source(type), staleId, "2026-11-01 10:00:00", System.currentTimeMillis()));
+        reports.retryAt(T); // 任务B先成功发送新记录。
+        assertNull(store.claim(source(type), staleId, "2026-11-01 10:00:00", System.currentTimeMillis()));
+        verify(sender, times(1)).sendOnce(anyLong(), anyList());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"INC", "VIB", "WLV"})
+    void sameHourNewerSampleWaitsUntilTheOlderInFlightAttemptFinishes(String type) {
+        device("A", type, 1, 1);
+        long oldId = reportSample(type, 10);
+        var store = new DeviceReportStateStore(jdbc.getDataSource());
+        String token = store.claim(source(type), oldId, "2026-11-01 10:00:00", System.currentTimeMillis());
+        assertNotNull(token);
+        reportSample(type, 50);
+        reports.retryAt(T);
+        verifyNoInteractions(sender); // 同测点同小时不能让两个不同源行并行发送。
+        store.complete(source(type), oldId, token, null, System.currentTimeMillis());
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender).sendOnce(eq(1L), argThat(data -> Double.parseDouble(data.get(0).getValue().get(0).get(1)) == 50));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"INC", "VIB", "WLV"})
+    void duplicateTimestampWithANewIdDoesNotResendAnAlreadySuccessfulSample(String type) {
+        device("A", type, 1, 1);
+        reportSample(type, 50);
+        reports.retryAt(T);
+        if ("WLV".equals(type)) {
+            reportSample(type, 50); // 水位允许同秒收到多条。
+        } else {
+            // 兼容外部补录或旧库产生的同时间重复行。
+            jdbc.update("""
+                    INSERT INTO incline_forward_data
+                        (device_code, remote_device_id, device_type, data_time, sample_time, payload, raw_data, create_time)
+                    SELECT device_code, remote_device_id, device_type, data_time, sample_time, payload, raw_data, create_time
+                    FROM incline_forward_data
+                    """);
+        }
+        // 判断成功记录应使用采集时间，不能依赖某条记录是否填写了report_time。
+        jdbc.update("UPDATE " + table(type) + " SET report_time=NULL WHERE report_status='SENT'");
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender, times(1)).sendOnce(anyLong(), anyList());
+    }
+
+    @Test
+    void failedGatewayIsRetriedWithoutResendingSuccessfulGateway() {
         device("A", "INC", 1, 1);
         device("B", "VIB", 2, 1);
         sample("A", "INC", "2026-11-01 09:59:00", "0.1");
         sample("B", "VIB", "2026-11-01 09:59:00", "0.006");
-        doThrow(new IllegalStateException("offline")).when(sender).sendOnce(eq(1L), anyList());
+        when(sender.sendOnce(eq(1L), anyList())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("offline")));
         reports.reportInclineVibAt(T);
-        verify(sender, times(1)).sendOnce(eq(1L), anyList());
+        assertEquals("FAILED", state("A").get("report_status"));
+        assertTrue(state("A").get("report_error").toString().contains("offline"));
+        assertNull(state("A").get("report_sent_at"));
+        assertEquals("SENT", state("B").get("report_status"));
+        when(sender.sendOnce(eq(1L), anyList())).thenReturn(CompletableFuture.completedFuture(null));
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender, times(2)).sendOnce(eq(1L), argThat(data ->
+                "2026-11-01 10:00:00.000".equals(data.get(0).getValue().get(0).get(0))));
         verify(sender, times(1)).sendOnce(eq(2L), anyList());
-        verifyNoMoreInteractions(sender);
-
-        // 无发送队列；清空源数据后下一刻度没有可以补发的内容。
-        jdbc.update("DELETE FROM incline_forward_data");
-        reports.reportInclineVibAt(T.plusSeconds(3600));
-        verifyNoMoreInteractions(sender);
+        assertEquals("SENT", state("A").get("report_status"));
+        assertEquals(2, state("A").get("report_attempts"));
+        assertNull(state("A").get("report_error"));
+        assertNotNull(state("A").get("report_sent_at"));
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void disablingSimulationUsesOnlyTheRealWindowAndSkipsCorruptPayloads() {
-        config.getInclineVib().getSimulation().setEnabled(false);
-        device("A", "INC", 1, 1);
-        device("BAD", "VIB", 1, 1);
-        sample("A", "INC", "2026-11-01 10:00:00", "0.1");
-        sample("BAD", "VIB", "2026-11-01 09:59:00", "0.006");
-        jdbc.update("UPDATE incline_forward_data SET payload = 'invalid' WHERE device_code = 'BAD'");
-        reports.reportInclineVibAt(T);
-        reports.reportInclineVibAt(T.plusSeconds(3600));
-        var values = ArgumentCaptor.forClass(List.class);
-        verify(sender, times(2)).sendOnce(eq(1L), values.capture());
-        List<MqttData> first = values.getAllValues().get(0);
-        List<MqttData> second = values.getAllValues().get(1);
-        assertEquals(1, first.size());
-        assertEquals(MqttData.class, first.get(0).getClass());
-        assertEquals(MqttData.class, second.get(0).getClass());
-        assertEquals("2026-11-01 10:00:00.000", first.get(0).getValue().get(0).get(0));
-        assertEquals("2026-11-01 11:00:00.000", second.get(0).getValue().get(0).get(0));
-        reports.reportInclineVibAt(T.plusSeconds(3601));
-        verifyNoMoreInteractions(sender);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void usesRealThroughOneHourLearnsBothChannelsThroughFourHoursAndStopsBeyondThat() {
-        device("REAL-INC", "INC", 1, 1);
-        device("HOLD-INC", "INC", 1, 1);
-        device("HOLD-VIB", "VIB", 1, 1);
-        device("EXPIRED", "VIB", 1, 1);
-        sample("REAL-INC", "INC", "2026-11-01 09:00:00", "0.123457");
-        learnedHistory("HOLD-INC", "INC", "2026-11-01 08:59:59", -0.345678);
-        learnedHistory("HOLD-VIB", "VIB", "2026-11-01 06:00:00", 0.0060);
-        sample("EXPIRED", "VIB", "2026-11-01 05:59:59", "9.9");
-        // 旧sample_time/入库时间可能是当前时间，不能用它们延长源数据有效期。
-        jdbc.update("UPDATE incline_forward_data SET sample_time = ?, create_time = '2026-11-01 10:00:00'",
-                T.toEpochMilli());
-        var before = jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id");
-
-        reports.reportInclineVibAt(T);
-
-        var values = ArgumentCaptor.forClass(List.class);
-        verify(sender).sendOnce(eq(1L), values.capture());
-        List<MqttData> data = values.getValue();
-        assertEquals(List.of("HOLD-INC", "HOLD-VIB", "REAL-INC"), data.stream().map(MqttData::getDeviceId).toList());
-        var inc = data.get(0);
-        assertEquals(MqttData.class, inc.getClass());
-        var vib = data.get(1);
-        assertEquals(MqttData.class, vib.getClass());
-        for (MqttData item : data) {
-            var wire = json.valueToTree(item);
-            assertFalse(wire.has("simulated"));
-            assertFalse(wire.has("source_time"));
-            assertFalse(wire.has("simulation_method"));
-        }
-        assertEquals("2026-11-01 10:00:00.000", inc.getValue().get(0).get(0));
-        assertEquals("2026-11-01 10:00:00.000", vib.getValue().get(0).get(0));
-        assertEquals(4, inc.getValue().get(0).size());
-        assertEquals(2, vib.getValue().get(0).size());
-        assertTrue(Double.parseDouble(inc.getValue().get(0).get(1)) >= -0.346078);
-        assertTrue(Double.parseDouble(inc.getValue().get(0).get(1)) <= -0.345278);
-        assertEquals(MqttData.class, data.get(2).getClass());
-        assertEquals(before, jdbc.queryForList("SELECT * FROM incline_forward_data ORDER BY id"));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void simulationNeverFeedsItselfAndNewRealDataAutomaticallyRestoresRealReporting() {
-        device("A", "INC", 1, 1);
-        learnedHistory("A", "INC", "2026-11-01 10:00:00", 0.123456);
-        for (int hour = 0; hour <= 5; hour++) {
-            reports.reportInclineVibAt(T.plusSeconds(hour * 3600L));
-        }
-        var values = ArgumentCaptor.forClass(List.class);
-        verify(sender, times(5)).sendOnce(eq(1L), values.capture());
-        for (int hour = 0; hour <= 4; hour++) {
-            List<MqttData> data = values.getAllValues().get(hour);
-            assertEquals(MqttData.class, data.get(0).getClass());
-            if (hour <= 1) assertEquals("0.123456", data.get(0).getValue().get(0).get(1));
-        }
-        assertEquals(6, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data", Integer.class));
-        verifyNoMoreInteractions(sender); // 第5小时不发送，模拟不能续期
-
-        sample("A", "INC", "2026-11-01 14:59:00", "0.234567");
-        clearInvocations(sender);
-        reports.reportInclineVibAt(T.plusSeconds(5 * 3600));
-        verify(sender).sendOnce(eq(1L), argThat(data -> data.size() == 1
-                && data.get(0).getClass() == MqttData.class
-                && "0.234567".equals(data.get(0).getValue().get(0).get(1))));
-    }
-
-    @Test
-    void waterNeverUsesTheInclineSimulationWindow() {
-        device("W", "WLV", 1, 1);
-        waterStore.saveCollectedData("W", 1.2, 8.8, T.minusSeconds(2 * 3600).atZone(ZONE));
-        reports.reportWaterLevelAt(T);
-        verifyNoInteractions(sender);
-    }
-
-    @Test
-    void insufficientHistorySkipsInsteadOfHoldingAndLearningDoesNotSeeFutureOrAnotherSensor() {
-        device("A", "INC", 1, 1);
-        sample("A", "INC", "2026-11-01 08:00:00", "0.123456");
+    void lateDataBackfillsItsOriginalHourWithoutSendingAnOpenHourOrExpiredData() {
+        for (String code : List.of("LATE", "OPEN", "EXPIRED", "RECENT")) device(code, "INC", 1, 1);
         reports.reportInclineVibAt(T);
         verifyNoInteractions(sender);
-
-        learnedHistory("A", "INC", "2026-11-01 08:00:00", 0.123456);
-        var mapper = (InclineForwardDataMapper) ReflectionTestUtils.getField(inclineStore, "mapper");
-        var anchor = mapper.selectLatestForReport("2026-11-01 06:00:00", "2026-11-01 08:00:00").get(0);
-        var learner = new HistoricalFluctuationSimulator(mapper, json,
-                    new InclineFluctuationService(new InclineFluctuationConfig(), null, new com.fasterxml.jackson.databind.ObjectMapper()));
-        var before = learner.simulate(anchor, T, config.getInclineVib().getSimulation()).orElseThrow();
-        assertEquals(6, before.trainingCount()); // 同一时间重复入库不会变成额外样本
-        sample("A", "INC", "2026-11-01 09:00:00", "999"); // 锚点之后不能用于学习
-        jdbc.update("""
-                INSERT INTO incline_forward_data
-                    (device_code, remote_device_id, device_type, data_time, sample_time, payload, raw_data, create_time)
-                SELECT device_code, 'OTHER-SN', device_type, data_time, sample_time, 'invalid', raw_data, create_time
-                FROM incline_forward_data WHERE device_code = 'A' AND data_time = '2026-11-01 08:00:00' LIMIT 1
-                """);
-        assertEquals(before, learner.simulate(anchor, T, config.getInclineVib().getSimulation()).orElseThrow());
-        assertEquals(6, mapper.selectSimulationHistory("A", "SN", "INC", "2026-10-30 08:00:00",
-                "2026-11-01 08:00:00", 24).size());
+        sample("LATE", "INC", "2026-11-01 08:59:00", "0.1");
+        sample("OPEN", "INC", "2026-11-01 10:01:00", "0.2");
+        sample("EXPIRED", "INC", "2026-10-31 10:04:59", "9");
+        sample("RECENT", "INC", "2026-10-31 10:05:01", "0.3");
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender).sendOnce(eq(1L), argThat(data -> data.size() == 1 && data.get(0).getDeviceId().equals("LATE")
+                && data.get(0).getValue().get(0).get(0).equals("2026-11-01 09:00:00.000")));
+        verify(sender).sendOnce(eq(1L), argThat(data -> data.size() == 1 && data.get(0).getDeviceId().equals("RECENT")
+                && data.get(0).getValue().get(0).get(0).equals("2026-10-31 11:00:00.000")));
+        assertEquals("PENDING", state("OPEN").get("report_status"));
+        assertEquals("PENDING", state("EXPIRED").get("report_status"));
+        reports.retryAt(T.plusSeconds(600));
+        verify(sender, times(2)).sendOnce(anyLong(), anyList());
     }
 
     @Test
-    void delayedExecutionKeepsScheduledTimeAndSkipsMissedTicks() {
+    void olderLateSamplesDoNotFallBackButANewerLateSampleCanCorrectTheHour() {
+        device("A", "INC", 1, 1);
+        sample("A", "INC", "2026-11-01 09:50:00", "0.1");
+        reports.reportInclineVibAt(T);
+        sample("A", "INC", "2026-11-01 09:40:00", "0.2");
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender, times(1)).sendOnce(anyLong(), anyList());
+        sample("A", "INC", "2026-11-01 09:59:00", "0.3");
+        reports.retryAt(T.plusSeconds(600));
+        verify(sender).sendOnce(eq(1L), argThat(data -> "0.3".equals(data.get(0).getValue().get(0).get(1))));
+        // 回查重复数据也不能重置快照或发送标记。
+        sample("A", "INC", "2026-11-01 09:59:00", "999");
+        reports.retryAt(T.plusSeconds(900));
+        verify(sender, times(2)).sendOnce(anyLong(), anyList());
+        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data", Integer.class));
+    }
+
+    @Test
+    void corruptPayloadIsMarkedFailedWithoutBlockingHealthySamples() {
+        device("BAD", "INC", 1, 1);
+        device("OK", "VIB", 1, 1);
+        sample("BAD", "INC", "2026-11-01 09:59:00", "0.1");
+        sample("OK", "VIB", "2026-11-01 09:59:00", "0.006");
+        jdbc.update("UPDATE incline_forward_data SET payload='broken' WHERE device_code='BAD'");
+        reports.reportInclineVibAt(T);
+        assertEquals("FAILED", state("BAD").get("report_status"));
+        assertEquals("SENT", state("OK").get("report_status"));
+        verify(sender).sendOnce(eq(1L), argThat(data -> data.size() == 1 && data.get(0).getDeviceId().equals("OK")));
+    }
+
+    @Test
+    void claimPreventsConcurrentSendAndRecoversAbandonedAttemptWithoutAcceptingStaleCompletion() {
         device("A", "INC", 1, 1);
         sample("A", "INC", "2026-11-01 09:59:00", "0.1");
-        ScheduledTaskRegistrar registrar = new ScheduledTaskRegistrar();
-        reports.configureTasks(registrar);
-        assertEquals(2, registrar.getTriggerTaskList().size());
-        var incline = registrar.getTriggerTaskList().get(0);
-        var water = registrar.getTriggerTaskList().get(1);
-        var context = new SimpleTriggerContext(Clock.fixed(T.minusSeconds(1), ZONE));
-        assertEquals(T, incline.getTrigger().nextExecution(context));
-        assertEquals(T, water.getTrigger().nextExecution(context));
-        context.update(T, T.plusSeconds(3), T.plusSeconds(4));
-        incline.getRunnable().run();
-        verify(sender).sendOnce(eq(1L), argThat(data ->
-                "2026-11-01 10:00:00.000".equals(data.get(0).getValue().get(0).get(0))));
-        assertEquals(T.plusSeconds(3600), incline.getTrigger().nextExecution(context));
-        assertEquals(T.plusSeconds(3600), water.getTrigger().nextExecution(context));
-        context.update(T, T.plusSeconds(3), T.plusSeconds(95 * 60));
-        assertEquals(T.plusSeconds(120 * 60), incline.getTrigger().nextExecution(context));
-        assertEquals(T.plusSeconds(120 * 60), water.getTrigger().nextExecution(context));
+        var store = new DeviceReportStateStore(jdbc.getDataSource());
+        long id = ((Number) state("A").get("id")).longValue();
+        var source = DeviceReportStateStore.Source.INCLINE;
+        String first = store.claim(source, id, "2026-11-01 10:00:00", 1000);
+        assertNotNull(first);
+        assertNull(store.claim(source, id, "2026-11-01 10:00:00", 1001));
+        String second = store.claim(source, id, "2026-11-01 10:00:00", 121000);
+        assertNotNull(second);
+        store.complete(source, id, first, null, 121001);
+        assertEquals("SENDING", state("A").get("report_status"));
+        store.complete(source, id, second, null, 121002);
+        assertEquals("SENT", state("A").get("report_status"));
+        assertNull(store.claim(source, id, "2026-11-01 10:00:00", 999999));
     }
 
     @Test
-    void configurationBindsAndCanDisableOneGroup() {
-        var properties = new org.springframework.mock.env.MockEnvironment()
-                .withProperty("device-report.incline-vib.cron", "-")
-                .withProperty("device-report.incline-vib.max-age", "90m")
-                .withProperty("device-report.incline-vib.simulation.enabled", "false")
-                .withProperty("device-report.incline-vib.simulation.max-source-age", "6h")
-                .withProperty("device-report.incline-vib.simulation.history-window", "72h")
-                .withProperty("device-report.incline-vib.simulation.history-size", "48")
-                .withProperty("device-report.incline-vib.simulation.min-history-size", "8")
-                .withProperty("device-report.incline-vib.simulation.max-history-gap", "2h")
-                .withProperty("device-report.incline-vib.simulation.volatility-scale", "0.5")
-                .withProperty("device-report.incline-vib.simulation.seed", "1234")
-                .withProperty("device-report.water-level.max-age", "20m");
-        var bound = org.springframework.boot.context.properties.bind.Binder.get(properties)
-                .bind("device-report", org.springframework.boot.context.properties.bind.Bindable.of(DeviceReportConfig.class))
-                .orElseThrow(IllegalStateException::new);
-        assertDoesNotThrow(bound::validate);
-        assertEquals(Duration.ofMinutes(20), bound.getWaterLevel().getMaxAge());
-        assertEquals(Duration.ofMinutes(90), bound.getInclineVib().getMaxAge());
-        assertFalse(bound.getInclineVib().getSimulation().isEnabled());
-        assertEquals(Duration.ofHours(6), bound.getInclineVib().getSimulation().getMaxSourceAge());
-        assertEquals(Duration.ofHours(72), bound.getInclineVib().getSimulation().getHistoryWindow());
-        assertEquals(48, bound.getInclineVib().getSimulation().getHistorySize());
-        assertEquals(8, bound.getInclineVib().getSimulation().getMinHistorySize());
-        assertEquals(Duration.ofHours(2), bound.getInclineVib().getSimulation().getMaxHistoryGap());
-        assertEquals(0.5, bound.getInclineVib().getSimulation().getVolatilityScale());
-        assertEquals(1234L, bound.getInclineVib().getSimulation().getSeed());
-        var disabled = new DeviceScheduledReportService(bound, null, null, json, sender, null);
+    void waterAlsoUsesOneHourAndRetriesWithTheOriginalStoredValues() {
+        device("W", "WLV", 1, 1);
+        device("OLD", "WLV", 1, 1);
+        waterStore.saveCollectedData("W", 6.75, 3.25, T.minusSeconds(60).atZone(ZONE));
+        waterStore.saveCollectedData("OLD", 1, 9, T.minusSeconds(3600).atZone(ZONE));
+        when(sender.sendOnce(anyLong(), anyList())).thenReturn(CompletableFuture.failedFuture(new IllegalStateException("offline")));
+        reports.reportWaterLevelAt(T);
+        assertEquals("FAILED", jdbc.queryForObject("SELECT report_status FROM water_level_data WHERE device_code='W'", String.class));
+        when(sender.sendOnce(anyLong(), anyList())).thenReturn(CompletableFuture.completedFuture(null));
+        reports.retryAt(T.plusSeconds(300));
+        verify(sender, times(2)).sendOnce(eq(1L), argThat(data -> data.size() == 1 && data.get(0).getValue().get(0)
+                .equals(List.of("2026-11-01 10:00:00.000", "6.7500", "3.2500"))));
+        assertEquals("SENT", jdbc.queryForObject("SELECT report_status FROM water_level_data WHERE device_code='W'", String.class));
+    }
+
+    @Test
+    void scheduledExecutionUsesPlannedHourAndConfigurationCanDisableGroupAndRetry() {
+        device("A", "INC", 1, 1);
+        sample("A", "INC", "2026-11-01 09:59:00", "0.1");
         var registrar = new ScheduledTaskRegistrar();
-        disabled.configureTasks(registrar);
+        reports.configureTasks(registrar);
+        assertEquals(3, registrar.getTriggerTaskList().size());
+        var task = registrar.getTriggerTaskList().get(0);
+        var context = new SimpleTriggerContext(Clock.fixed(T.minusSeconds(1), ZONE));
+        assertEquals(T, task.getTrigger().nextExecution(context));
+        context.update(T, T.plusSeconds(3), T.plusSeconds(4));
+        task.getRunnable().run();
+        verify(sender).sendOnce(eq(1L), argThat(data -> data.get(0).getValue().get(0).get(0).equals("2026-11-01 10:00:00.000")));
+        config.getInclineVib().setCron("-");
+        config.setRetryCron("-");
+        assertDoesNotThrow(config::validate);
+        registrar = new ScheduledTaskRegistrar();
+        reports.configureTasks(registrar);
         assertEquals(1, registrar.getTriggerTaskList().size());
-        bound.getWaterLevel().setMaxAge(Duration.ZERO);
-        assertThrows(IllegalArgumentException.class, bound::validate);
+        sample("A", "INC", "2026-11-01 10:59:00", "0.2");
+        reports.reportInclineVibAt(T.plusSeconds(3600));
+        reports.retryAt(T.plusSeconds(3600));
+        verify(sender, times(1)).sendOnce(anyLong(), anyList());
+        config.getWaterLevel().setCron("0 */30 * * * *");
+        assertThrows(IllegalArgumentException.class, config::validate);
     }
 
-    @Test
-    void rejectsInvalidSimulationWindowsAndAcceptsDefaults() {
-        assertDoesNotThrow(config::validate);
-        for (Duration invalid : List.of(Duration.ZERO, Duration.ofHours(-1), Duration.ofMinutes(30),
-                Duration.ofHours(1), Duration.ofMillis(3600001))) {
-            config.getInclineVib().getSimulation().setMaxSourceAge(invalid);
-            assertThrows(IllegalArgumentException.class, config::validate);
+    private java.util.Map<String, Object> state(String code) {
+        return jdbc.queryForMap("SELECT * FROM incline_forward_data WHERE device_code=? ORDER BY data_time DESC LIMIT 1", code);
+    }
+
+    private String table(String type) {
+        return "WLV".equals(type) ? "water_level_data" : "incline_forward_data";
+    }
+
+    private DeviceReportStateStore.Source source(String type) {
+        return "WLV".equals(type) ? DeviceReportStateStore.Source.WATER : DeviceReportStateStore.Source.INCLINE;
+    }
+
+    private long reportSample(String type, int minute) {
+        if ("WLV".equals(type)) {
+            waterStore.saveCollectedData("A", minute, 1, T.minusSeconds((60L - minute) * 60).atZone(ZONE));
+        } else {
+            sample("A", type, String.format("2026-11-01 09:%02d:00", minute), Integer.toString(minute));
         }
-        config.getInclineVib().getSimulation().setMaxSourceAge(Duration.ofHours(4));
-        assertDoesNotThrow(config::validate);
-        config.getInclineVib().getSimulation().setMinHistorySize(5);
-        assertThrows(IllegalArgumentException.class, config::validate);
-        config.getInclineVib().getSimulation().setMinHistorySize(6);
-        for (double invalid : new double[]{0, -1, Double.NaN, Double.POSITIVE_INFINITY, 1.1}) {
-            config.getInclineVib().getSimulation().setVolatilityScale(invalid);
-            assertThrows(IllegalArgumentException.class, config::validate);
-        }
+        return jdbc.queryForObject("SELECT MAX(id) FROM " + table(type), Long.class);
     }
 
     private void device(String code, String type, long gateway, int enabled) {
         jdbc.update("INSERT INTO s_device_info_ext VALUES (?, ?, 'SN', ?, ?)", code, type, gateway, enabled);
-    }
-
-    private void learnedHistory(String code, String type, String sourceTime, double center) {
-        var end = java.time.LocalDateTime.parse(sourceTime,
-                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(ZONE);
-        double[] deviations = {-0.0004, 0.0002, -0.0002, 0.0004, -0.0002, 0};
-        for (int i = 0; i < deviations.length; i++) {
-            String time = end.minusHours(5 - i).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            sample(code, type, time, java.math.BigDecimal.valueOf(center + deviations[i])
-                    .setScale(6, java.math.RoundingMode.HALF_UP).toPlainString());
-        }
     }
 
     private void sample(String code, String type, String time, String value) {

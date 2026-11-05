@@ -74,6 +74,28 @@ class InclineForwardDataTest {
     }
 
     @Test
+    void upgradesLegacySnapshotsWithoutChangingTheirPayloadAndPreservesDeliveryState() throws Exception {
+        var source = new DriverManagerDataSource("jdbc:sqlite:" + directory.resolve("legacy.db"));
+        var jdbc = new JdbcTemplate(source);
+        jdbc.execute("""
+                CREATE TABLE incline_forward_data (id INTEGER PRIMARY KEY, device_code TEXT,
+                    remote_device_id TEXT, device_type TEXT, data_time TEXT, sample_time BIGINT,
+                    payload TEXT, raw_data TEXT, create_time TEXT)
+                """);
+        jdbc.update("INSERT INTO incline_forward_data VALUES (1,'A','SN','INC','2026-11-01 09:59:00',1,'[[0,1,2,3]]','{}','2026-11-01 10:00:00')");
+        var service = new InclineForwardDataService(mapper(source), new ObjectMapper(), source);
+        service.initTable();
+        assertEquals("PENDING", jdbc.queryForObject("SELECT report_status FROM incline_forward_data", String.class));
+        assertEquals(0, jdbc.queryForObject("SELECT report_attempts FROM incline_forward_data", Integer.class));
+        jdbc.update("UPDATE incline_forward_data SET report_status='SENT', report_attempts=2, report_sent_at=123");
+        service.initTable();
+        assertEquals("SENT", jdbc.queryForObject("SELECT report_status FROM incline_forward_data", String.class));
+        assertEquals(2, jdbc.queryForObject("SELECT report_attempts FROM incline_forward_data", Integer.class));
+        assertEquals("[[0,1,2,3]]", jdbc.queryForObject("SELECT payload FROM incline_forward_data", String.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data", Integer.class));
+    }
+
+    @Test
     void cleanupDeletesOnlySnapshotsCreatedBeforeCutoffAndPreservesBoundary() throws Exception {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
                 "jdbc:sqlite:" + directory.resolve("cleanup.db"));

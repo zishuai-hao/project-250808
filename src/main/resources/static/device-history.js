@@ -37,11 +37,21 @@
         return Number.isFinite(value) ? `${value.toFixed(series.precision)} ${series.unit}` : "缺失";
     }
 
+    function deliveryText(point) {
+        const delivery = point.delivery;
+        if (!delivery) return "发送状态未知";
+        const labels = {PENDING: "未发送", SENDING: "发送中", SENT: "已提交 MQTT", FAILED: "发送失败，待补发"};
+        return (labels[delivery.status] || "发送状态未知")
+            + (delivery.reportTime ? ` · 所属整点 ${delivery.reportTime}` : "")
+            + (delivery.attempts ? ` · 已尝试 ${delivery.attempts} 次` : "");
+    }
+
     function describePoint(index) {
         pointIndex = index;
         const point = data.points[index];
         details.textContent = `${fullTimeFormat.format(point.time)}　` + data.series
-            .map((series, i) => `${series.name}：${formatNumber(point.values[i], series)}`).join("　");
+            .map((series, i) => `${series.name}：${formatNumber(point.values[i], series)}`).join("　")
+            + `　${deliveryText(point)}`;
     }
 
     function draw() {
@@ -78,7 +88,7 @@
                     return fullTimeFormat.format(data.points[index].time) + "\n" + items.map(item => {
                         const series = data.series[item.seriesIndex];
                         return `${series.name}：${formatNumber(item.value[1], series)}`;
-                    }).join("\n");
+                    }).join("\n") + "\n" + deliveryText(data.points[index]);
                 },
             },
             xAxis: {

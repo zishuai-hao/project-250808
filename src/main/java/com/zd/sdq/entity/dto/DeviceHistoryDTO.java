@@ -6,5 +6,6 @@ import java.util.List;
 public record DeviceHistoryDTO(String deviceCode, String deviceType, long fromTime, long toTime,
                                List<Series> series, List<Point> points, boolean truncated) {
     public record Series(String name, String unit, int precision) {}
-    public record Point(long time, List<Double> values) {}
+    public record Point(long time, List<Double> values, Delivery delivery) {}
+    public record Delivery(String status, String reportTime, Integer attempts, Long sentAt, String error) {}
 }

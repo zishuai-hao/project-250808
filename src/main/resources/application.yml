@@ -83,25 +83,15 @@ vibration:
       - ZYXH-VIB-P01-002-02
       - CBXH-VIB-P01-001-03
 
-# 两组均在北京时间每小时整点上报；有效期按原始采集时间判断，边界包含。
-# cron 设为 "-" 可关闭该组上报；失败仅记日志，不重试、不补发。
+# 每小时整点发送 (上一整点, 当前整点] 内每测点最新真实数据，不生成模拟值。
+# cron 为 "-" 时关闭本组发送及补发，采集仍运行。
 device-report:
   zone: Asia/Shanghai
+  retry-cron: "0 */5 * * * *" # 每5分钟补发最近24小时已结束小时的未成功记录；- 可关闭补发
   incline-vib:
     cron: "0 0 * * * *"
-    max-age: 1h  # 含边界，1小时内使用真实采集值
-    simulation:
-      enabled: true  # 仅INC/VIB；关闭后超出max-age即跳过
-      max-source-age: 4h  # 超过1小时、但不超过4小时，学习历史波动后模拟；超过4小时不上传
-      history-window: 48h
-      history-size: 24  # 最近最多24条正常真实记录
-      min-history-size: 6  # 不足则跳过，不回退原值保持
-      max-history-gap: 90m  # 不跨越较大的采集断档学习
-      volatility-scale: 1.0  # 历史残差波动系数，范围(0,1]
-      seed: 20261101  # 重启或重复计算时，同一源记录保持同一模拟路径
   water-level:
     cron: "0 0 * * * *"
-    max-age: 75m
 
 server:
   port: 42009

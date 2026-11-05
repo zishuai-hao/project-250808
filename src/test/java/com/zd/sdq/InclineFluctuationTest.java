@@ -237,7 +237,8 @@ class InclineFluctuationTest {
             assertEquals((pass + 1)*2, jdbc.queryForObject("SELECT COUNT(*) FROM incline_forward_data", Integer.class));
         }
         assertEquals(Set.of("id", "device_code", "remote_device_id", "device_type", "data_time", "sample_time",
-                "payload", "raw_data", "create_time"), jdbc.queryForList("PRAGMA table_info(incline_forward_data)")
+                "payload", "raw_data", "create_time", "report_status", "report_time", "report_attempts",
+                "report_attempted_at", "report_sent_at", "report_error", "report_token"), jdbc.queryForList("PRAGMA table_info(incline_forward_data)")
                 .stream().map(c -> c.get("name")).collect(java.util.stream.Collectors.toSet()));
     }
 

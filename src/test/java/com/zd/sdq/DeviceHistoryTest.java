@@ -136,6 +136,8 @@ class DeviceHistoryTest {
         mvc.perform(get("/api/device-history/VIB"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.deviceCode").value("VIB"))
                 .andExpect(jsonPath("$.points[0].values[0]").value(0.25))
+                .andExpect(jsonPath("$.points[0].delivery.status").value("PENDING"))
+                .andExpect(jsonPath("$.points[0].delivery.attempts").value(0))
                 .andExpect(jsonPath("$.series[0].unit").value("m/s²"));
         mvc.perform(get("/api/device-history/INC")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.points").isEmpty());

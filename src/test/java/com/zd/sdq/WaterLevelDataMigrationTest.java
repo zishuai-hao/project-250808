@@ -33,6 +33,8 @@ class WaterLevelDataMigrationTest {
             assertEquals("2026-11-01 09:59:00", jdbc.queryForObject("SELECT data_time FROM water_level_data", String.class));
             assertEquals(6.75, jdbc.queryForObject("SELECT water_level FROM water_level_data", Double.class));
             assertNull(jdbc.queryForObject("SELECT payload FROM water_level_data", String.class));
+            assertEquals("PENDING", jdbc.queryForObject("SELECT report_status FROM water_level_data", String.class));
+            assertEquals(0, jdbc.queryForObject("SELECT report_attempts FROM water_level_data", Integer.class));
         }
     }
 }

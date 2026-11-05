@@ -2,8 +2,10 @@ package com.zd.sdq.service.incline;
 
 import cn.hutool.core.date.DateUtil;
 import com.company.cbf.starter.data.entity.MqttData;
+import com.company.cbf.starter.data.service.forward.device.DeviceType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zd.sdq.service.DeviceReportStateStore;
 import com.zd.sdq.entity.DeviceInfoExt;
 import com.zd.sdq.entity.InclineForwardData;
 import com.zd.sdq.entity.dto.incline.InclineHistoryResponse;
@@ -30,9 +32,10 @@ public class InclineForwardDataService {
 
     @PostConstruct
     public void initTable() {
-        // 仅初始化新增快照表，不启用全局 SQL 初始化或改动现有业务表。
+        // 按需初始化采集表及发送状态，不启用全局 SQL 初始化。
         new ResourceDatabasePopulator(new ClassPathResource("db/create_incline_forward_table.sql"))
                 .execute(dataSource);
+        DeviceReportStateStore.migrate(dataSource, DeviceReportStateStore.Source.INCLINE);
     }
 
     /** 每天北京时间 03:00 清理入库超过 45 天的快照。 */
@@ -43,10 +46,21 @@ public class InclineForwardDataService {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         try {
             int deletedCount = mapper.deleteCreatedBefore(cutoffTime);
+            mapper.deleteFilteredBefore(cutoffTime);
             log.info("清理入库超过45天的倾角采集数据完成，删除 {} 条，时间阈值: {}", deletedCount, cutoffTime);
         } catch (Exception e) {
             log.error("清理倾角采集历史数据失败，时间阈值: {}", cutoffTime, e);
         }
+    }
+
+    public boolean hasCollectedData(DeviceInfoExt device, String remoteDeviceId, String time) {
+        return mapper.countCollected(device.getDeviceCode(), remoteDeviceId, device.getDeviceType().name(), time) > 0
+                || (device.getDeviceType() == DeviceType.VIB
+                && mapper.countFiltered(device.getDeviceCode(), remoteDeviceId, time) > 0);
+    }
+
+    public void markFilteredVibration(VibrationSpikeFilter.Sample sample) {
+        mapper.insertFiltered(sample.device().getDeviceCode(), sample.device().getRemoteDeviceId(), sample.record().getTm());
     }
 
     public void saveCollectedData(DeviceInfoExt device, String remoteDeviceId,
@@ -64,8 +78,6 @@ public class InclineForwardDataService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("序列化采集数据失败，测点: " + device.getDeviceCode(), e);
         }
-        if (mapper.insert(snapshot) != 1) {
-            throw new IllegalStateException("保存采集数据失败，测点: " + device.getDeviceCode());
-        }
+        mapper.insertIfAbsent(snapshot);
     }
 }

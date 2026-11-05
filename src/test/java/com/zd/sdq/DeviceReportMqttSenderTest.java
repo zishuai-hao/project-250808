@@ -52,13 +52,13 @@ class DeviceReportMqttSenderTest {
     void disconnectAndDisabledGatewaySkipWithoutPublishing() {
         connected();
         when(client.isConnected()).thenReturn(false);
-        sender.sendOnce(1L, List.of(data("A", "INC")));
+        assertTrue(sender.sendOnce(1L, List.of(data("A", "INC"))).isCompletedExceptionally());
         verify(client, never()).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
         when(client.isConnected()).thenReturn(true);
         var gateway = new MqttClientConfigEntity();
         gateway.setEnable(false);
         when(gateways.selectById(1L)).thenReturn(gateway);
-        sender.sendOnce(1L, List.of(data("A", "INC")));
+        assertTrue(sender.sendOnce(1L, List.of(data("A", "INC"))).isCompletedExceptionally());
         verify(client, never()).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
     }
 
@@ -94,7 +94,7 @@ class DeviceReportMqttSenderTest {
             callback.handle(Future.failedFuture("offline"));
             return client;
         }).when(client).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
-        assertDoesNotThrow(() -> sender.sendOnce(1L, List.of(data("A", "INC"))));
+        assertTrue(sender.sendOnce(1L, List.of(data("A", "INC"))).isCompletedExceptionally());
         verify(client, times(1)).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
     }
 
@@ -103,8 +103,21 @@ class DeviceReportMqttSenderTest {
         connected();
         doThrow(new IllegalStateException("closed")).when(client)
                 .publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
-        assertDoesNotThrow(() -> sender.sendOnce(1L, List.of(data("A", "INC"))));
+        assertTrue(sender.sendOnce(1L, List.of(data("A", "INC"))).isCompletedExceptionally());
         verify(client, times(1)).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), any());
+    }
+
+    @Test
+    void completionWaitsForTheAsynchronousPublishResult() {
+        connected();
+        var completion = sender.sendOnce(1L, List.of(data("A", "INC")));
+        assertFalse(completion.isDone());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<io.vertx.core.Handler<io.vertx.core.AsyncResult<Integer>>> callback = ArgumentCaptor.forClass(io.vertx.core.Handler.class);
+        verify(client).publish(anyString(), any(), any(), anyBoolean(), anyBoolean(), callback.capture());
+        callback.getValue().handle(Future.succeededFuture(1));
+        assertDoesNotThrow(completion::join);
+        assertTrue(completion.isDone());
     }
 
     private void connected() {

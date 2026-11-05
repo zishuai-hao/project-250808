@@ -7,8 +7,9 @@ import lombok.Data;
 
 /** INC/VIB采集处理快照，供定时上报查询，表名沿用旧版本。 */
 @Data
+@lombok.EqualsAndHashCode(callSuper = true)
 @TableName("incline_forward_data")
-public class InclineForwardData {
+public class InclineForwardData extends DeviceReportState {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String deviceCode;

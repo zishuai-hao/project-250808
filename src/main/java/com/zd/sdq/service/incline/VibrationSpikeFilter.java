@@ -40,13 +40,20 @@ public class VibrationSpikeFilter {
 
     /** 转发失败时回滚窗口，下一轮重试仍能拿到原记录。 */
     public void process(DeviceInfoExt device, InclineRecord record, Consumer<Sample> forward) {
+        process(device, record, forward, sample -> { });
+    }
+
+    public void process(DeviceInfoExt device, InclineRecord record, Consumer<Sample> forward,
+                        Consumer<Sample> discarded) {
         Window window = windows.computeIfAbsent(device.getDeviceCode(), code -> new Window());
         synchronized (window) {
             Window before = window.copy();
             try {
-                for (Sample sample : accept(window, device, record)) {
+                List<Sample> removed = new ArrayList<>();
+                for (Sample sample : accept(window, device, record, removed)) {
                     forward.accept(sample);
                 }
+                removed.forEach(discarded);
             } catch (RuntimeException | Error e) {
                 window.restore(before);
                 throw e;
@@ -54,7 +61,21 @@ public class VibrationSpikeFilter {
         }
     }
 
-    private List<Sample> accept(Window window, DeviceInfoExt device, InclineRecord record) {
+    /** 独立重放有序历史；不会倒退实时窗口，仍按相同尖峰规则判断。 */
+    public void replayHistory(DeviceInfoExt device, List<InclineRecord> records, Consumer<Sample> forward,
+                              Consumer<Sample> discarded) {
+        Window window = new Window();
+        for (InclineRecord record : records) {
+            List<Sample> removed = new ArrayList<>();
+            accept(window, device, record, removed).forEach(forward);
+            removed.forEach(discarded);
+        }
+        if (window.pending != null && clock.millis() - window.pending.time() >= maxGapMillis()) {
+            forward.accept(window.pending.sample());
+        }
+    }
+
+    private List<Sample> accept(Window window, DeviceInfoExt device, InclineRecord record, List<Sample> removed) {
         List<Sample> ready = new ArrayList<>(2);
         Sample sample = new Sample(device, record);
         Double raw = record.getAccMaxZ();
@@ -94,6 +115,7 @@ public class VibrationSpikeFilter {
             Point pending = window.pending;
             boolean recovered = recovered(window, current);
             if (recovered && largerThan(pending, current, window.excursionBaseline)) {
+                removed.add(pending.sample());
                 log.warn("过滤孤立振动尖峰：测点[{}]，SN[{}]，采集时间[{}]，accMaxZ原值[{}]mG，前/中/后[{} / {} / {}]m/s²，历史幅值中位数[{}]m/s²，accMaxX[{}]mG，accMaxY[{}]mG，runStatus[{}]，alarmStatus[{}]",
                         device.getDeviceCode(), device.getRemoteDeviceId(), pending.sample().record().getTm(),
                         pending.sample().record().getAccMaxZ(), window.previous.acceleration(), pending.acceleration(),

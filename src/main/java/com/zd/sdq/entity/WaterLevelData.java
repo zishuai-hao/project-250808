@@ -14,10 +14,11 @@ import lombok.NoArgsConstructor;
  * @date 2025/12/05
  */
 @Data
+@lombok.EqualsAndHashCode(callSuper = true)
 @TableName(value = "water_level_data")
 @NoArgsConstructor
 @AllArgsConstructor
-public class WaterLevelData {
+public class WaterLevelData extends DeviceReportState {
     /**
      * 主键ID
      */

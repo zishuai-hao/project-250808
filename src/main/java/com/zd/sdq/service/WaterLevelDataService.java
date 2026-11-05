@@ -44,6 +44,7 @@ public class WaterLevelDataService {
         if (!hasPayload) {
             jdbc.execute("ALTER TABLE water_level_data ADD COLUMN payload TEXT");
         }
+        DeviceReportStateStore.migrate(dataSource, DeviceReportStateStore.Source.WATER);
     }
 
     public void saveCollectedData(String deviceCode, double difference, double waterLevel,

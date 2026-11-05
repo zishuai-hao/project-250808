@@ -83,8 +83,8 @@ public class InclineDataHandler {
         }
         log.info("找到 {} 个 HTTP-Client 类型设备", allDevices.size());
 
-        // 初始化每个远程设备的最新数据时间为当前时间
-        Date currentTime = new Date();
+        // 启动也回查24小时，避免停机期间的真实记录丢失
+        Date currentTime = Date.from(java.time.Instant.now().minusSeconds(24 * 3600));
 
         try {
             // 根据remoteDeviceId分组（实际上每组固定两个设备），每个组内根据 ID 取模构建延迟时间，并查询数据
@@ -112,11 +112,13 @@ public class InclineDataHandler {
                     vertx.executeBlocking(promise -> {
                         try {
                             log.debug("在 Worker 线程中查询远程设备[{}]数据", remoteDeviceId);
+                            var end = ZonedDateTime.now(zoneId);
+                            var format = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
                             InclineHistoryResponse response = fetchDeviceData(remoteDeviceId,
-                                    DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)),
-                                    DateUtil.formatDateTime(new Date()));
+                                    end.minusHours(24).format(format), end.format(format));
                             // 解析、过滤和SQLite写入也在Worker线程中完成。
                             processResponse(devices, response, remoteDeviceId);
+                            processBackfillResponse(devices, response, remoteDeviceId);
                             promise.complete();
                         } catch (Exception e) {
                             log.error("查询远程设备[{}]数据时发生异常", remoteDeviceId, e);
@@ -153,52 +155,52 @@ public class InclineDataHandler {
      * 查询单个设备的数据
      */
     public InclineHistoryResponse fetchDeviceData(String remoteDeviceId, String startTime, String endTime) {
-        InclineHistoryResponse response = null;
-
-        log.debug(">>> 开始查询设备[{}]的数据，时间范围: {} ~ {}", remoteDeviceId, startTime, endTime);
-
-        // 从 Map 中获取上次查询的时间
-        Date lastTime = remoteDeviceIdLastDataTimeMap.get(remoteDeviceId);
-        if (lastTime == null) {
-            lastTime = new Date();
-        }
-
         try {
-            // 确保已登录
-            if (StrUtil.isBlank(inclineApiService.getLoginToken())) {
-                log.error("Token 为空，先进行登录...");
-                inclineApiService.refreshToken();
-            }
-
-            // 构建查询请求
-            InclineHistoryRequest request = new InclineHistoryRequest();
-            request.setSn(remoteDeviceId);
-            request.setStartTm(startTime);
-            request.setEndTm(endTime);
-            // 从最早未处理记录开始，积压数据下次接续，避免倒序分页跳过中间记录。
-            request.setSortMode("asc");
-            request.setPagesize(100);
-            response = inclineApiService.getHistoryData(request);
-        } catch (IOException e) {
-            log.error("查询设备[{}]数据失败: {}", remoteDeviceId, e.getMessage(), e);
-
-            // 如果是认证失败，尝试重新登录
-            if (e.getMessage() != null && e.getMessage().contains("401")) {
-                log.info("认证失败，尝试重新登录...");
+            if (StrUtil.isBlank(inclineApiService.getLoginToken())) inclineApiService.refreshToken();
+            List<InclineHistoryResponse.InclineRecord> all = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            InclineHistoryResponse response = null;
+            boolean refreshed = false;
+            int received = 0;
+            for (int page = 1; page <= 1000; page++) {
+                InclineHistoryRequest request = new InclineHistoryRequest();
+                request.setSn(remoteDeviceId);
+                request.setStartTm(startTime);
+                request.setEndTm(endTime);
+                request.setSortMode("asc");
+                request.setPagesize(100);
+                request.setCurpagenum(page);
                 try {
+                    response = inclineApiService.getHistoryData(request);
+                } catch (IOException e) {
+                    if (refreshed || e.getMessage() == null || !e.getMessage().contains("401")) throw e;
+                    refreshed = true;
                     inclineApiService.refreshToken();
-                    // 重试一次
-                    response = fetchDeviceData(remoteDeviceId, DateUtil.formatDateTime(lastTime),
-                            DateUtil.formatDateTime(new Date()));
-                } catch (Exception retryException) {
-                    log.error("重新登录后重试失败", retryException);
+                    response = inclineApiService.getHistoryData(request);
                 }
+                if (response == null || response.getData() == null || response.getData().getResultData() == null) return null;
+                var records = response.getData().getResultData();
+                received += records.size();
+                int before = all.size();
+                for (var record : records) {
+                    if (record.getTm() != null && record.getTm().compareTo(startTime) >= 0
+                            && record.getTm().compareTo(endTime) <= 0 && seen.add(record.getTm())) all.add(record);
+                }
+                Integer count = response.getData().getCount();
+                Integer actualPageSize = response.getData().getPagesize();
+                int pageSize = actualPageSize != null && actualPageSize > 0 ? actualPageSize : 100;
+                if (records.isEmpty() || (count != null && received >= count)
+                        || (count == null && records.size() < pageSize)) {
+                    response.getData().setResultData(all);
+                    return response;
+                }
+                if (all.size() == before) throw new IllegalStateException("历史接口分页未推进");
             }
+            throw new IllegalStateException("24小时历史数据超过分页上限");
         } catch (Exception e) {
-            log.error("查询设备[{}]数据时发生异常", remoteDeviceId, e);
+            log.error("查询设备24小时历史失败，下轮重查，SN: {}，范围: {} ~ {}", remoteDeviceId, startTime, endTime, e);
+            return null;
         }
-
-        return response;
     }
     public static ZoneId zoneId = ZoneId.of("Asia/Shanghai");
 
@@ -240,61 +242,17 @@ public class InclineDataHandler {
                         remoteDeviceId, record.getTm(), DateUtil.formatDateTime(remoteDeviceIdLastDataTimeMap.get(remoteDeviceId)));
                 continue;
             }
-            ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(),
-                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
-
             // 将远程传感器的数据分配到两个本地设备中
             for (DeviceInfoExt device : devices) {
+                if (inclineForwardDataService.hasCollectedData(device, remoteDeviceId, record.getTm())) continue;
                 // 如果是 VIB 设备，则发送加速度最大值数据
                 if (device.getDeviceType().equals(DeviceType.VIB)) {
-                    vibrationSpikeFilter.process(device, record, this::saveVibration);
+                    vibrationSpikeFilter.process(device, record, this::saveVibration,
+                            inclineForwardDataService::markFilteredVibration);
                 }
                 // 如果是 INC 设备，则发送角度数据和温度数据
                 else if (device.getDeviceType().equals(DeviceType.INC)) {
-                    if (!finite(record.getAngleX()) || !finite(record.getAngleY()) || !finite(record.getTemp())) {
-                        log.warn("跳过无效倾角采集值，测点: {}，采集时间: {}", device.getDeviceCode(), record.getTm());
-                        continue;
-                    }
-                    var corrected = inclineBaselineService.apply(
-                            device.getDeviceCode(), record.getAngleX(), record.getAngleY());
-                    boolean initializeZero = corrected.baseline() == null;
-                    if (initializeZero && record != latestNewIncline) continue;
-                    var angles = initializeZero ? new InclineFluctuationService.Angles(0, 0)
-                            : inclineFluctuationService.apply(device, record, corrected);
-                    MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
-                    builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
-                    builder.monitoringCode(device.getDeviceCode());
-                    builder.addData(
-                            zonedDateTime,
-                            NumberUtil.roundStr(angles.x(), 6),
-                            NumberUtil.roundStr(angles.y(), 6),
-                            NumberUtil.roundStr(record.getTemp(), 3));
-                    MqttData mqttData = builder.build();
-
-                    if (initializeZero) {
-                        corrected = inclineBaselineService.initializeAndStoreZero(device.getDeviceCode(),
-                                record.getAngleX(), record.getAngleY(), () -> inclineForwardDataService
-                                        .saveCollectedData(device, remoteDeviceId, record, mqttData));
-                    } else {
-                        inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
-                    }
-                    Map<String, Object> latestData = new LinkedHashMap<>();
-                    latestData.put("angleX", NumberUtil.roundStr(angles.x(), 6));
-                    latestData.put("angleY", NumberUtil.roundStr(angles.y(), 6));
-                    latestData.put("rawAngleX", record.getAngleX());
-                    latestData.put("rawAngleY", record.getAngleY());
-                    latestData.put("baselineApplied", corrected.baseline() != null);
-                    if (corrected.baseline() != null) {
-                        latestData.put("baselineX", corrected.baseline().angleX());
-                        latestData.put("baselineY", corrected.baseline().angleY());
-                        latestData.put("baselineUpdatedAt", corrected.baseline().updatedAt());
-                    }
-                    latestData.put("temp", NumberUtil.roundStr(record.getTemp(), 3));
-                    latestData.put("angleUnit", "deg");
-                    latestData.put("tempUnit", "C");
-                    latestData.put("alarmStatus", record.getAlarmStatus());
-                    latestData.put("runStatus", record.getRunStatus());
-                    deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
+                    collectIncline(device, remoteDeviceId, record, record == latestNewIncline);
                 } else {
                     log.warn("设备[{}]类型[{}]不支持", device.getDeviceCode(), device.getDeviceType());
                 }
@@ -302,6 +260,79 @@ public class InclineDataHandler {
             // 同一采集记录的全部通道处理完成后再推进，保存失败时保留重试机会。
             remoteDeviceIdLastDataTimeMap.put(remoteDeviceId, recordTime);
             log.debug("更新远程设备[{}]最新数据时间为 {}", remoteDeviceId, DateUtil.formatDateTime(recordTime));
+        }
+    }
+
+    private void collectIncline(DeviceInfoExt device, String remoteDeviceId,
+                                InclineHistoryResponse.InclineRecord record, boolean allowInitializeZero) {
+        ZonedDateTime zonedDateTime = LocalDateTime.parse(record.getTm(),
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).atZone(zoneId);
+        if (!finite(record.getAngleX()) || !finite(record.getAngleY()) || !finite(record.getTemp())) {
+            log.warn("跳过无效倾角采集值，测点: {}，采集时间: {}", device.getDeviceCode(), record.getTm());
+            return;
+        }
+        var corrected = inclineBaselineService.apply(
+                device.getDeviceCode(), record.getAngleX(), record.getAngleY());
+        boolean initializeZero = corrected.baseline() == null;
+        if (initializeZero && !allowInitializeZero) return;
+        var angles = initializeZero ? new InclineFluctuationService.Angles(0, 0)
+                : inclineFluctuationService.apply(device, record, corrected);
+        MqttDataBuilder builder = new MqttDataBuilder(DeviceType.INC);
+        builder.sampleTime(zonedDateTime.toInstant().toEpochMilli());
+        builder.monitoringCode(device.getDeviceCode());
+        builder.addData(
+                zonedDateTime,
+                NumberUtil.roundStr(angles.x(), 6),
+                NumberUtil.roundStr(angles.y(), 6),
+                NumberUtil.roundStr(record.getTemp(), 3));
+        MqttData mqttData = builder.build();
+
+        if (initializeZero) {
+            corrected = inclineBaselineService.initializeAndStoreZero(device.getDeviceCode(),
+                    record.getAngleX(), record.getAngleY(), () -> inclineForwardDataService
+                            .saveCollectedData(device, remoteDeviceId, record, mqttData));
+        } else {
+            inclineForwardDataService.saveCollectedData(device, remoteDeviceId, record, mqttData);
+        }
+        Map<String, Object> latestData = new LinkedHashMap<>();
+        latestData.put("angleX", NumberUtil.roundStr(angles.x(), 6));
+        latestData.put("angleY", NumberUtil.roundStr(angles.y(), 6));
+        latestData.put("rawAngleX", record.getAngleX());
+        latestData.put("rawAngleY", record.getAngleY());
+        latestData.put("baselineApplied", corrected.baseline() != null);
+        if (corrected.baseline() != null) {
+            latestData.put("baselineX", corrected.baseline().angleX());
+            latestData.put("baselineY", corrected.baseline().angleY());
+            latestData.put("baselineUpdatedAt", corrected.baseline().updatedAt());
+        }
+        latestData.put("temp", NumberUtil.roundStr(record.getTemp(), 3));
+        latestData.put("angleUnit", "deg");
+        latestData.put("tempUnit", "C");
+        latestData.put("alarmStatus", record.getAlarmStatus());
+        latestData.put("runStatus", record.getRunStatus());
+        deviceLatestDataCache.updateLatestData(device, "INCLINE_HTTP", latestData, record.getTm());
+    }
+
+    /** 回补最新游标之前的缺口；已有快照和发送状态均不改写。 */
+    public void processBackfillResponse(List<DeviceInfoExt> devices, InclineHistoryResponse response, String remoteDeviceId) {
+        if (response == null || response.getData() == null || response.getData().getResultData() == null) return;
+        var ordered = response.getData().getResultData().stream()
+                .sorted(Comparator.comparing(InclineHistoryResponse.InclineRecord::getTm)).toList();
+        for (DeviceInfoExt device : devices) {
+            if (device.getDeviceType() == DeviceType.INC) {
+                for (var record : ordered) {
+                    if (!inclineForwardDataService.hasCollectedData(device, remoteDeviceId, record.getTm())) {
+                        collectIncline(device, remoteDeviceId, record, false);
+                    }
+                }
+            } else if (device.getDeviceType() == DeviceType.VIB) {
+                // 用完整且有序的历史窗口判断迟到点，不把它塞入实时窗口改变相邻关系。
+                vibrationSpikeFilter.replayHistory(device, ordered, sample -> {
+                    if (!inclineForwardDataService.hasCollectedData(device, remoteDeviceId, sample.record().getTm())) {
+                        saveVibration(sample);
+                    }
+                }, inclineForwardDataService::markFilteredVibration);
+            }
         }
     }
 
@@ -317,6 +348,7 @@ public class InclineDataHandler {
     private void saveVibration(VibrationSpikeFilter.Sample sample) {
         DeviceInfoExt device = sample.device();
         InclineHistoryResponse.InclineRecord record = sample.record();
+        if (inclineForwardDataService.hasCollectedData(device, device.getRemoteDeviceId(), record.getTm())) return;
         String accelerationValue = NumberUtil.roundStr(record.getAccMaxZ() * VibrationSpikeFilter.MG_TO_M_S2, 4);
         // 延后放行仍保存原始采集时间，不能因晚入库而延长上报有效期。
         ZonedDateTime sampleTime = LocalDateTime.parse(record.getTm(),
